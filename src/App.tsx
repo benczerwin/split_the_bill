@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { BillState, Item } from './types'
 import { computeSplit } from './lib/calculations'
 import { loadApiKey, loadBillState, saveApiKey, saveBillState } from './lib/storage'
-import { nowAsDateOnly } from './lib/dateUtils'
+import { nowAsDateOnly, toDateOnly } from './lib/dateUtils'
 import PeopleManager from './components/PeopleManager'
 import ItemsList from './components/ItemsList'
 import TaxTipPanel from './components/TaxTipPanel'
@@ -30,7 +30,10 @@ function makeDefaultState(): BillState {
 }
 
 export default function App() {
-  const [state, setState] = useState<BillState>(() => ({ ...makeDefaultState(), ...loadBillState() }))
+  const [state, setState] = useState<BillState>(() => {
+    const loaded = loadBillState()
+    return { ...makeDefaultState(), ...loaded, date: toDateOnly(loaded?.date) }
+  })
   const [apiKey, setApiKey] = useState(() => loadApiKey())
   const [showSettings, setShowSettings] = useState(false)
   const [showScan, setShowScan] = useState(false)
@@ -114,7 +117,9 @@ export default function App() {
 
   async function handleImportFile(file: File) {
     if (state.people.length > 0 || state.items.length > 0) {
-      const confirmed = window.confirm('Importing will replace the current bill. Continue?')
+      const confirmed = window.confirm(
+        'Importing replaces everything in your current bill — title, date, people, items, tax, tip, and cash back. Continue?',
+      )
       if (!confirmed) return
     }
     setIsImporting(true)
@@ -156,8 +161,8 @@ export default function App() {
               onClick={() => importInputRef.current?.click()}
               disabled={isImporting}
               className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
-              aria-label="Import bill from PDF"
-              title="Import bill from PDF"
+              aria-label="Import bill from PDF (replaces the current bill)"
+              title="Import bill from PDF — replaces the current bill"
             >
               {isImporting ? (
                 <span className="block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
