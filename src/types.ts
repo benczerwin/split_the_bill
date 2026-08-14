@@ -15,6 +15,7 @@ export interface Item {
 export type TipMode = 'amount' | 'percent'
 
 export interface BillState {
+  title: string
   people: Person[]
   items: Item[]
   tax: number
