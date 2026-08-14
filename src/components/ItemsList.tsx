@@ -1,6 +1,7 @@
 import type { Item, Person } from '../types'
 import ItemRow from './ItemRow'
 import { formatCurrency } from '../lib/calculations'
+import { CameraIcon } from './icons'
 
 interface ItemsListProps {
   items: Item[]
@@ -22,7 +23,8 @@ export default function ItemsList({ items, people, subtotal, onAdd, onChange, on
           onClick={onScanReceipt}
           className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
         >
-          📷 Scan receipt
+          <CameraIcon className="h-4 w-4" />
+          Scan receipt
         </button>
       </div>
       <p className="mt-1 text-xs text-slate-400">

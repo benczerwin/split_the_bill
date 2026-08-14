@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { fileToBase64, scanReceipt, type ScannedReceipt } from '../lib/receiptScan'
 import { formatCurrency } from '../lib/calculations'
+import { CameraIcon } from './icons'
 
 interface ReceiptScanModalProps {
   apiKey: string
@@ -104,7 +105,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                 </>
               ) : (
                 <>
-                  <span className="text-2xl">📷</span>
+                  <CameraIcon className="h-7 w-7" />
                   <span className="text-sm font-medium">Take a photo or choose a file</span>
                 </>
               )}
@@ -140,8 +141,9 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                     <input
                       type="number"
                       step="0.01"
-                      value={item.price}
+                      value={item.price === 0 ? '' : item.price}
                       onChange={(e) => updateDraft(index, { price: e.target.valueAsNumber || 0 })}
+                      onFocus={(e) => e.target.select()}
                       className="w-full rounded-lg border border-slate-300 py-1 pl-5 pr-2 text-sm"
                     />
                   </div>

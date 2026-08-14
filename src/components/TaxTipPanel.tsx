@@ -33,8 +33,9 @@ export default function TaxTipPanel({
               type="number"
               inputMode="decimal"
               step="0.01"
-              value={Number.isFinite(tax) ? tax : ''}
+              value={tax === 0 ? '' : tax}
               onChange={(e) => onTaxChange(e.target.valueAsNumber || 0)}
+              onFocus={(e) => e.target.select()}
               className="w-full rounded-lg border border-slate-300 py-2 pl-6 pr-3 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
             />
           </div>
@@ -47,8 +48,9 @@ export default function TaxTipPanel({
               type="number"
               inputMode="decimal"
               step="0.01"
-              value={Number.isFinite(tipValue) ? tipValue : ''}
+              value={tipValue === 0 ? '' : tipValue}
               onChange={(e) => onTipValueChange(e.target.valueAsNumber || 0)}
+              onFocus={(e) => e.target.select()}
               className="w-full rounded-l-lg px-3 py-2 text-sm focus:outline-none"
             />
             <select
@@ -69,8 +71,9 @@ export default function TaxTipPanel({
               type="number"
               inputMode="decimal"
               step="0.1"
-              value={Number.isFinite(cashBackPercent) ? cashBackPercent : ''}
+              value={cashBackPercent === 0 ? '' : cashBackPercent}
               onChange={(e) => onCashBackChange(e.target.valueAsNumber || 0)}
+              onFocus={(e) => e.target.select()}
               className="w-full rounded-lg border border-slate-300 py-2 pl-3 pr-7 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
             />
             <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">%</span>
