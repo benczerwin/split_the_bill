@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { fileToBase64, scanReceipt, type ScannedReceipt } from '../lib/receiptScan'
 import { scanReceiptOCR } from '../lib/ocrScan'
+import { PASTE_PROMPT, parsePastedReceiptText } from '../lib/pasteParse'
 import { formatCurrency } from '../lib/calculations'
 import { CameraIcon } from './icons'
 
@@ -18,13 +19,15 @@ interface DraftItem {
 }
 
 type Status = 'idle' | 'loading' | 'error' | 'ready'
-type Engine = 'claude' | 'ocr'
+type Engine = 'claude' | 'ocr' | 'paste'
 
 export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onApply }: ReceiptScanModalProps) {
   const [engine, setEngine] = useState<Engine>(apiKey ? 'claude' : 'ocr')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
   const [ocrProgress, setOcrProgress] = useState(0)
+  const [pasteText, setPasteText] = useState('')
+  const [promptCopied, setPromptCopied] = useState(false)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([])
   const [taxValue, setTaxValue] = useState<number | null>(null)
   const [tipValue, setTipValue] = useState<number | null>(null)
@@ -33,6 +36,15 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
   const [receipt, setReceipt] = useState<ScannedReceipt | null>(null)
   const [usedEngine, setUsedEngine] = useState<Engine>(engine)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  function applyResult(result: ScannedReceipt) {
+    setUsedEngine(engine)
+    setReceipt(result)
+    setDraftItems(result.items.map((item) => ({ ...item, include: true })))
+    setTaxValue(result.tax)
+    setTipValue(result.tip)
+    setStatus('ready')
+  }
 
   async function handleFile(file: File) {
     setStatus('loading')
@@ -47,14 +59,26 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
               return scanReceipt(apiKey, base64, mediaType)
             })()
           : await scanReceiptOCR(file, setOcrProgress)
-      setUsedEngine(engine)
-      setReceipt(result)
-      setDraftItems(result.items.map((item) => ({ ...item, include: true })))
-      setTaxValue(result.tax)
-      setTipValue(result.tip)
-      setStatus('ready')
+      applyResult(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong scanning that receipt.')
+      setStatus('error')
+    }
+  }
+
+  function handleCopyPrompt() {
+    navigator.clipboard.writeText(PASTE_PROMPT).then(() => {
+      setPromptCopied(true)
+      setTimeout(() => setPromptCopied(false), 1500)
+    })
+  }
+
+  function handleParsePaste() {
+    setError('')
+    try {
+      applyResult(parsePastedReceiptText(pasteText))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not parse that text.')
       setStatus('error')
     }
   }
@@ -84,25 +108,34 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
 
         {status !== 'ready' && (
           <div className="mt-4">
-            <div className="flex rounded-lg bg-slate-100 p-1 text-sm">
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 text-xs">
               <button
                 type="button"
                 onClick={() => apiKey && setEngine('claude')}
                 disabled={!apiKey}
-                className={`flex-1 rounded-md py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                className={`rounded-md py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
                   engine === 'claude' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
                 }`}
               >
-                Claude (accurate)
+                Claude
               </button>
               <button
                 type="button"
                 onClick={() => setEngine('ocr')}
-                className={`flex-1 rounded-md py-1.5 font-medium transition ${
+                className={`rounded-md py-1.5 font-medium transition ${
                   engine === 'ocr' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
                 }`}
               >
-                Free on-device OCR
+                Free OCR
+              </button>
+              <button
+                type="button"
+                onClick={() => setEngine('paste')}
+                className={`rounded-md py-1.5 font-medium transition ${
+                  engine === 'paste' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                Paste from AI
               </button>
             </div>
 
@@ -112,7 +145,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                 <button type="button" onClick={onOpenSettings} className="font-medium underline">
                   Add one in Settings
                 </button>
-                , or use the free option instead.
+                , or use a free option instead.
               </p>
             )}
             {engine === 'ocr' && (
@@ -121,40 +154,81 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                 at telling items apart from tax/tip/totals. Review carefully before applying.
               </p>
             )}
+            {engine === 'paste' && (
+              <p className="mt-2 text-xs text-slate-400">
+                Copy this prompt into ChatGPT, Claude, or any AI with vision, along with a photo of your receipt,
+                then paste its reply below.
+              </p>
+            )}
 
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) handleFile(file)
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={status === 'loading'}
-              className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-10 text-slate-500 hover:border-slate-400 disabled:opacity-60"
-            >
-              {status === 'loading' ? (
-                <>
-                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-                  <span className="text-sm">
-                    {engine === 'ocr'
-                      ? `Reading your receipt on-device… ${Math.round(ocrProgress * 100)}%`
-                      : 'Reading your receipt…'}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <CameraIcon className="h-7 w-7" />
-                  <span className="text-sm font-medium">Take a photo or choose a file</span>
-                </>
-              )}
-            </button>
-            {status === 'error' && <p className="mt-3 text-sm text-red-600">{error}</p>}
+            {engine === 'paste' ? (
+              <div className="mt-3">
+                <div className="relative">
+                  <pre className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 pr-16 font-mono text-[11px] leading-snug text-slate-600">
+                    {PASTE_PROMPT}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={handleCopyPrompt}
+                    className="absolute right-2 top-2 rounded-md bg-white px-2 py-1 text-xs font-medium text-indigo-700 shadow ring-1 ring-slate-200 hover:bg-indigo-50"
+                  >
+                    {promptCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <textarea
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  placeholder="Paste the AI's reply here…"
+                  rows={6}
+                  className="mt-3 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleParsePaste}
+                  disabled={!pasteText.trim()}
+                  className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Parse pasted text
+                </button>
+                {status === 'error' && <p className="mt-3 text-sm text-red-600">{error}</p>}
+              </div>
+            ) : (
+              <>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handleFile(file)
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  disabled={status === 'loading'}
+                  className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-10 text-slate-500 hover:border-slate-400 disabled:opacity-60"
+                >
+                  {status === 'loading' ? (
+                    <>
+                      <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+                      <span className="text-sm">
+                        {engine === 'ocr'
+                          ? `Reading your receipt on-device… ${Math.round(ocrProgress * 100)}%`
+                          : 'Reading your receipt…'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <CameraIcon className="h-7 w-7" />
+                      <span className="text-sm font-medium">Take a photo or choose a file</span>
+                    </>
+                  )}
+                </button>
+                {status === 'error' && <p className="mt-3 text-sm text-red-600">{error}</p>}
+              </>
+            )}
           </div>
         )}
 

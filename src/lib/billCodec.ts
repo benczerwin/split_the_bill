@@ -1,11 +1,11 @@
 import type { BillState } from '../types'
-import { nowAsDateTimeLocal } from './dateUtils'
+import { nowAsDateOnly } from './dateUtils'
 
 /** Compact, QR-friendly encoding of a bill — short keys, person indices instead of ids/colors. */
 export interface CompactBill {
   v: 1
   n: string // title
-  d?: string // date (datetime-local value) — optional so older exports without it still decode
+  d?: string // date ("YYYY-MM-DD") — optional so older exports without it still decode
   p: string[] // person names, array index doubles as their id
   i: [string, number, number[]][] // [name, price, assignedPersonIndices] — [] means everyone
   t: number // tax
@@ -49,7 +49,7 @@ export function compactToBillState(compact: CompactBill): BillState {
   }))
   return {
     title: compact.n ?? '',
-    date: compact.d ?? nowAsDateTimeLocal(),
+    date: compact.d ?? nowAsDateOnly(),
     people,
     items,
     tax: compact.t,

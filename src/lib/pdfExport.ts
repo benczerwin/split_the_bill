@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import type { BillState, SplitSummary } from '../types'
 import { formatCurrency } from './calculations'
 import { encodeBillForQR } from './billCodec'
-import { formatDateTimeLocal } from './dateUtils'
+import { formatDateOnly } from './dateUtils'
 
 const WIDTH = 80 // mm — classic receipt width
 const MARGIN = 6
@@ -64,7 +64,7 @@ function render(doc: jsPDF, state: BillState, summary: SplitSummary, qrDataUrl: 
   doc.setFont('courier', 'normal')
   doc.setFontSize(7.5)
   doc.setTextColor(120)
-  doc.text(formatDateTimeLocal(state.date) || new Date().toLocaleString(), CENTER, y, { align: 'center' })
+  doc.text(formatDateOnly(state.date) || new Date().toLocaleDateString(), CENTER, y, { align: 'center' })
   doc.setTextColor(0)
   y += 5
   dashedRule()

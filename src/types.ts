@@ -16,7 +16,7 @@ export type TipMode = 'amount' | 'percent'
 
 export interface BillState {
   title: string
-  /** datetime-local input value, e.g. "2026-08-14T19:30" */
+  /** date input value, e.g. "2026-08-14" */
   date: string
   people: Person[]
   items: Item[]

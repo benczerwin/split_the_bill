@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { BillState, Item } from './types'
 import { computeSplit } from './lib/calculations'
 import { loadApiKey, loadBillState, saveApiKey, saveBillState } from './lib/storage'
-import { nowAsDateTimeLocal } from './lib/dateUtils'
+import { nowAsDateOnly } from './lib/dateUtils'
 import PeopleManager from './components/PeopleManager'
 import ItemsList from './components/ItemsList'
 import TaxTipPanel from './components/TaxTipPanel'
@@ -18,7 +18,7 @@ function uid(): string {
 function makeDefaultState(): BillState {
   return {
     title: '',
-    date: nowAsDateTimeLocal(),
+    date: nowAsDateOnly(),
     people: [],
     items: [],
     tax: 0,
@@ -221,11 +221,11 @@ export default function App() {
             type="text"
             value={state.title}
             onChange={(e) => setState((prev) => ({ ...prev, title: e.target.value }))}
-            placeholder="Untitled bill (e.g. Friday Dinner)"
+            placeholder="Untitled bill"
             className="min-w-[10rem] flex-1 rounded-xl border border-transparent bg-transparent px-1 py-1 text-xl font-semibold text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:px-3 focus:py-2 focus:outline-none focus:ring-1 focus:ring-slate-300"
           />
           <input
-            type="datetime-local"
+            type="date"
             value={state.date}
             onChange={(e) => setState((prev) => ({ ...prev, date: e.target.value }))}
             className="shrink-0 rounded-xl border border-transparent bg-transparent px-1 py-1 text-sm text-slate-500 focus:border-slate-300 focus:bg-white focus:px-3 focus:py-2 focus:outline-none focus:ring-1 focus:ring-slate-300"
