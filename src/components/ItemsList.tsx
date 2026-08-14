@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Item, Person } from '../types'
 import ItemRow from './ItemRow'
 import SwipeToDelete from './SwipeToDelete'
@@ -15,6 +16,8 @@ interface ItemsListProps {
 }
 
 export default function ItemsList({ items, people, subtotal, onAdd, onChange, onDelete, onScanReceipt }: ItemsListProps) {
+  const [openItemId, setOpenItemId] = useState<string | null>(null)
+
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
       <div className="flex items-center justify-between">
@@ -35,7 +38,12 @@ export default function ItemsList({ items, people, subtotal, onAdd, onChange, on
 
       <div className="mt-4 space-y-3">
         {items.map((item) => (
-          <SwipeToDelete key={item.id} onDelete={() => onDelete(item.id)}>
+          <SwipeToDelete
+            key={item.id}
+            onDelete={() => onDelete(item.id)}
+            isOpen={openItemId === item.id}
+            onOpenChange={(open) => setOpenItemId(open ? item.id : null)}
+          >
             <ItemRow item={item} people={people} onChange={(patch) => onChange(item.id, patch)} onDelete={() => onDelete(item.id)} />
           </SwipeToDelete>
         ))}
