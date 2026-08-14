@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { BillState, Item } from './types'
 import { computeSplit } from './lib/calculations'
 import { loadApiKey, loadBillState, saveApiKey, saveBillState } from './lib/storage'
-import { nowAsDateOnly } from './lib/dateUtils'
+import { nowAsDateOnly, toDateOnly } from './lib/dateUtils'
 import PeopleManager from './components/PeopleManager'
 import ItemsList from './components/ItemsList'
 import TaxTipPanel from './components/TaxTipPanel'
@@ -30,7 +30,10 @@ function makeDefaultState(): BillState {
 }
 
 export default function App() {
-  const [state, setState] = useState<BillState>(() => ({ ...makeDefaultState(), ...loadBillState() }))
+  const [state, setState] = useState<BillState>(() => {
+    const loaded = loadBillState()
+    return { ...makeDefaultState(), ...loaded, date: toDateOnly(loaded?.date) }
+  })
   const [apiKey, setApiKey] = useState(() => loadApiKey())
   const [showSettings, setShowSettings] = useState(false)
   const [showScan, setShowScan] = useState(false)

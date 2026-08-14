@@ -1,5 +1,5 @@
 import type { BillState } from '../types'
-import { nowAsDateOnly } from './dateUtils'
+import { toDateOnly } from './dateUtils'
 
 /** Compact, QR-friendly encoding of a bill — short keys, person indices instead of ids/colors. */
 export interface CompactBill {
@@ -49,7 +49,7 @@ export function compactToBillState(compact: CompactBill): BillState {
   }))
   return {
     title: compact.n ?? '',
-    date: compact.d ?? nowAsDateOnly(),
+    date: toDateOnly(compact.d),
     people,
     items,
     tax: compact.t,
