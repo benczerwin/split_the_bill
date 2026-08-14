@@ -1,0 +1,63 @@
+import type { Item, Person } from '../types'
+import ItemRow from './ItemRow'
+import { formatCurrency } from '../lib/calculations'
+
+interface ItemsListProps {
+  items: Item[]
+  people: Person[]
+  subtotal: number
+  onAdd: () => void
+  onChange: (id: string, patch: Partial<Item>) => void
+  onDelete: (id: string) => void
+  onScanReceipt: () => void
+}
+
+export default function ItemsList({ items, people, subtotal, onAdd, onChange, onDelete, onScanReceipt }: ItemsListProps) {
+  return (
+    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-slate-800">Items</h2>
+        <button
+          type="button"
+          onClick={onScanReceipt}
+          className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+        >
+          📷 Scan receipt
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-slate-400">
+        Tap the &ldquo;Everyone&rdquo; pill or specific names to control who splits each item.
+      </p>
+
+      <div className="mt-4 space-y-3">
+        {items.map((item) => (
+          <ItemRow
+            key={item.id}
+            item={item}
+            people={people}
+            onChange={(patch) => onChange(item.id, patch)}
+            onDelete={() => onDelete(item.id)}
+          />
+        ))}
+        {items.length === 0 && (
+          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400">
+            No items yet. Add one, or scan a receipt.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onAdd}
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          + Add item
+        </button>
+        <p className="text-sm text-slate-600">
+          Subtotal: <span className="font-semibold text-slate-900">{formatCurrency(subtotal)}</span>
+        </p>
+      </div>
+    </section>
+  )
+}
