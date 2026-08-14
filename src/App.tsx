@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import type { BillState, Item } from './types'
 import { computeSplit } from './lib/calculations'
 import { loadApiKey, loadBillState, saveApiKey, saveBillState } from './lib/storage'
+import { nowAsDateTimeLocal } from './lib/dateUtils'
 import PeopleManager from './components/PeopleManager'
 import ItemsList from './components/ItemsList'
 import TaxTipPanel from './components/TaxTipPanel'
 import ResultsPanel from './components/ResultsPanel'
 import SettingsModal from './components/SettingsModal'
 import ReceiptScanModal from './components/ReceiptScanModal'
-import { DownloadIcon, GearIcon, UploadIcon } from './components/icons'
+import { DownloadIcon, GearIcon, TrashIcon, UploadIcon } from './components/icons'
 
 function uid(): string {
   return crypto.randomUUID()
@@ -17,6 +18,7 @@ function uid(): string {
 function makeDefaultState(): BillState {
   return {
     title: '',
+    date: nowAsDateTimeLocal(),
     people: [],
     items: [],
     tax: 0,
@@ -89,6 +91,13 @@ export default function App() {
       tipMode: result.tip !== null ? 'amount' : prev.tipMode,
       tipValue: result.tip !== null ? result.tip : prev.tipValue,
     }))
+  }
+
+  function handleClearAll() {
+    const hasData = state.people.length > 0 || state.items.length > 0 || state.title.trim() !== ''
+    if (hasData && !window.confirm('Clear the whole bill? This removes all people, items, and settings.')) return
+    setState(makeDefaultState())
+    setImportNotice(null)
   }
 
   async function handleExport() {
@@ -172,6 +181,15 @@ export default function App() {
             </button>
             <button
               type="button"
+              onClick={handleClearAll}
+              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500"
+              aria-label="Clear all"
+              title="Clear all"
+            >
+              <TrashIcon className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
               onClick={() => setShowSettings(true)}
               className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               aria-label="Settings"
@@ -198,13 +216,21 @@ export default function App() {
       )}
 
       <main className="mx-auto mt-6 flex max-w-3xl flex-col gap-6 px-4">
-        <input
-          type="text"
-          value={state.title}
-          onChange={(e) => setState((prev) => ({ ...prev, title: e.target.value }))}
-          placeholder="Untitled bill (e.g. Friday Dinner)"
-          className="rounded-xl border border-transparent bg-transparent px-1 py-1 text-xl font-semibold text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:px-3 focus:py-2 focus:outline-none focus:ring-1 focus:ring-slate-300"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={state.title}
+            onChange={(e) => setState((prev) => ({ ...prev, title: e.target.value }))}
+            placeholder="Untitled bill (e.g. Friday Dinner)"
+            className="min-w-[10rem] flex-1 rounded-xl border border-transparent bg-transparent px-1 py-1 text-xl font-semibold text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:px-3 focus:py-2 focus:outline-none focus:ring-1 focus:ring-slate-300"
+          />
+          <input
+            type="datetime-local"
+            value={state.date}
+            onChange={(e) => setState((prev) => ({ ...prev, date: e.target.value }))}
+            className="shrink-0 rounded-xl border border-transparent bg-transparent px-1 py-1 text-sm text-slate-500 focus:border-slate-300 focus:bg-white focus:px-3 focus:py-2 focus:outline-none focus:ring-1 focus:ring-slate-300"
+          />
+        </div>
         <PeopleManager people={state.people} onAdd={addPerson} onRemove={removePerson} />
         <ItemsList
           items={state.items}
