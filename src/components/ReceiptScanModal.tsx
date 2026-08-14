@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { fileToBase64, scanReceipt, type ScannedReceipt } from '../lib/receiptScan'
-import { scanReceiptOCR } from '../lib/ocrScan'
+import { scanReceiptOCR, parseReceiptText } from '../lib/ocrScan'
 import { PASTE_PROMPT, parsePastedReceiptText } from '../lib/pasteParse'
 import { formatCurrency } from '../lib/calculations'
 import { CameraIcon } from './icons'
@@ -19,7 +19,7 @@ interface DraftItem {
 }
 
 type Status = 'idle' | 'loading' | 'error' | 'ready'
-type Engine = 'claude' | 'ocr' | 'paste'
+type Engine = 'claude' | 'ocr' | 'paste' | 'livetext'
 
 export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onApply }: ReceiptScanModalProps) {
   const [engine, setEngine] = useState<Engine>(apiKey ? 'claude' : 'ocr')
@@ -27,6 +27,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
   const [error, setError] = useState('')
   const [ocrProgress, setOcrProgress] = useState(0)
   const [pasteText, setPasteText] = useState('')
+  const [liveText, setLiveText] = useState('')
   const [promptCopied, setPromptCopied] = useState(false)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([])
   const [taxValue, setTaxValue] = useState<number | null>(null)
@@ -83,6 +84,20 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
     }
   }
 
+  function handleParseLiveText() {
+    setError('')
+    try {
+      const result = parseReceiptText(liveText)
+      if (result.items.length === 0) {
+        throw new Error('No item lines found in that text — make sure you copied the whole receipt.')
+      }
+      applyResult(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not parse that text.')
+      setStatus('error')
+    }
+  }
+
   function updateDraft(index: number, patch: Partial<DraftItem>) {
     setDraftItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
   }
@@ -108,7 +123,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
 
         {status !== 'ready' && (
           <div className="mt-4">
-            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 text-xs">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-xs">
               <button
                 type="button"
                 onClick={() => apiKey && setEngine('claude')}
@@ -137,6 +152,15 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
               >
                 Paste from AI
               </button>
+              <button
+                type="button"
+                onClick={() => setEngine('livetext')}
+                className={`rounded-md py-1.5 font-medium transition ${
+                  engine === 'livetext' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                Paste scanned text
+              </button>
             </div>
 
             {engine === 'claude' && !apiKey && (
@@ -158,6 +182,13 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
               <p className="mt-2 text-xs text-slate-400">
                 Copy this prompt into ChatGPT, Claude, or any AI with vision, along with a photo of your receipt,
                 then paste its reply below.
+              </p>
+            )}
+            {engine === 'livetext' && (
+              <p className="mt-2 text-xs text-slate-400">
+                Your phone's own text scanner reads photos much better than the free OCR above. Open the receipt
+                photo, use it to select and copy all the text (iPhone: Live Text — tap the text-select icon in
+                Photos; Android: Google Lens), then paste the raw result below. We'll pick out the items ourselves.
               </p>
             )}
 
@@ -186,6 +217,25 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                   type="button"
                   onClick={handleParsePaste}
                   disabled={!pasteText.trim()}
+                  className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Parse pasted text
+                </button>
+                {status === 'error' && <p className="mt-3 text-sm text-red-600">{error}</p>}
+              </div>
+            ) : engine === 'livetext' ? (
+              <div className="mt-3">
+                <textarea
+                  value={liveText}
+                  onChange={(e) => setLiveText(e.target.value)}
+                  placeholder="Paste the scanned receipt text here…"
+                  rows={8}
+                  className="w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleParseLiveText}
+                  disabled={!liveText.trim()}
                   className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Parse pasted text
@@ -241,6 +291,12 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
               <p className="mt-1 text-xs text-amber-700">
                 Scanned with free on-device OCR — double-check names and prices, especially anything that isn&rsquo;t
                 a plain item line.
+              </p>
+            )}
+            {usedEngine === 'livetext' && (
+              <p className="mt-1 text-xs text-amber-700">
+                Character recognition should be solid, but double-check we picked out the right lines as items vs.
+                tax/tip.
               </p>
             )}
             <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
