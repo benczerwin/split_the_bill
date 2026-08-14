@@ -1,15 +1,22 @@
 import { useRef, useState } from 'react'
+import type { ClipboardEvent } from 'react'
 import { fileToBase64, scanReceipt, type ScannedReceipt } from '../lib/receiptScan'
-import { scanReceiptOCR, parseReceiptText } from '../lib/ocrScan'
+import { parseReceiptText } from '../lib/receiptTextParser'
 import { PASTE_PROMPT, parsePastedReceiptText } from '../lib/pasteParse'
 import { formatCurrency } from '../lib/calculations'
+import { formatDateOnly } from '../lib/dateUtils'
 import { CameraIcon } from './icons'
 
 interface ReceiptScanModalProps {
   apiKey: string
   onClose: () => void
   onOpenSettings: () => void
-  onApply: (result: { items: { name: string; price: number }[]; tax: number | null; tip: number | null }) => void
+  onApply: (result: {
+    items: { name: string; price: number }[]
+    tax: number | null
+    tip: number | null
+    date: string | null
+  }) => void
 }
 
 interface DraftItem {
@@ -19,21 +26,37 @@ interface DraftItem {
 }
 
 type Status = 'idle' | 'loading' | 'error' | 'ready'
-type Engine = 'claude' | 'ocr' | 'paste' | 'livetext'
+type Engine = 'claude' | 'paste' | 'livetext'
+
+/**
+ * A partial (drag) selection copy of iOS Live Text can land on the clipboard URL-encoded
+ * (literal "%20"/"%0A" instead of spaces/newlines) rather than as plain text. Decode it back
+ * if that's what we're looking at, instead of inserting the garbled version.
+ */
+function normalizePastedText(raw: string): string {
+  if (!/%[0-9A-Fa-f]{2}/.test(raw)) return raw
+  try {
+    const decoded = decodeURIComponent(raw)
+    return decoded !== raw ? decoded : raw
+  } catch {
+    return raw
+  }
+}
 
 export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onApply }: ReceiptScanModalProps) {
-  const [engine, setEngine] = useState<Engine>(apiKey ? 'claude' : 'ocr')
+  const [engine, setEngine] = useState<Engine>(apiKey ? 'claude' : 'paste')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
-  const [ocrProgress, setOcrProgress] = useState(0)
   const [pasteText, setPasteText] = useState('')
   const [liveText, setLiveText] = useState('')
   const [promptCopied, setPromptCopied] = useState(false)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([])
   const [taxValue, setTaxValue] = useState<number | null>(null)
   const [tipValue, setTipValue] = useState<number | null>(null)
+  const [dateValue, setDateValue] = useState<string | null>(null)
   const [applyTax, setApplyTax] = useState(true)
   const [applyTip, setApplyTip] = useState(true)
+  const [applyDate, setApplyDate] = useState(true)
   const [receipt, setReceipt] = useState<ScannedReceipt | null>(null)
   const [usedEngine, setUsedEngine] = useState<Engine>(engine)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -44,23 +67,21 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
     setDraftItems(result.items.map((item) => ({ ...item, include: true })))
     setTaxValue(result.tax)
     setTipValue(result.tip)
+    setDateValue(result.date)
     setStatus('ready')
   }
 
   async function handleFile(file: File) {
+    if (!apiKey) {
+      setError('Add your Anthropic API key in Settings first.')
+      setStatus('error')
+      return
+    }
     setStatus('loading')
     setError('')
-    setOcrProgress(0)
     try {
-      const result =
-        engine === 'claude'
-          ? await (async () => {
-              if (!apiKey) throw new Error('Add your Anthropic API key in Settings first.')
-              const { base64, mediaType } = await fileToBase64(file)
-              return scanReceipt(apiKey, base64, mediaType)
-            })()
-          : await scanReceiptOCR(file, setOcrProgress)
-      applyResult(result)
+      const { base64, mediaType } = await fileToBase64(file)
+      applyResult(await scanReceipt(apiKey, base64, mediaType))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong scanning that receipt.')
       setStatus('error')
@@ -72,6 +93,20 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
       setPromptCopied(true)
       setTimeout(() => setPromptCopied(false), 1500)
     })
+  }
+
+  function pasteNormalizingHandler(setter: (value: string) => void) {
+    return (e: ClipboardEvent<HTMLTextAreaElement>) => {
+      const raw = e.clipboardData.getData('text/plain')
+      if (!raw) return
+      const normalized = normalizePastedText(raw)
+      if (normalized === raw) return // let the default paste happen unmodified
+      e.preventDefault()
+      const el = e.currentTarget
+      const start = el.selectionStart ?? el.value.length
+      const end = el.selectionEnd ?? el.value.length
+      setter(el.value.slice(0, start) + normalized + el.value.slice(end))
+    }
   }
 
   function handleParsePaste() {
@@ -107,6 +142,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
       items: draftItems.filter((item) => item.include).map(({ name, price }) => ({ name, price })),
       tax: applyTax ? taxValue : null,
       tip: applyTip ? tipValue : null,
+      date: applyDate ? dateValue : null,
     })
     onClose()
   }
@@ -123,7 +159,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
 
         {status !== 'ready' && (
           <div className="mt-4">
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-xs">
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 text-xs">
               <button
                 type="button"
                 onClick={() => apiKey && setEngine('claude')}
@@ -133,15 +169,6 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                 }`}
               >
                 Claude
-              </button>
-              <button
-                type="button"
-                onClick={() => setEngine('ocr')}
-                className={`rounded-md py-1.5 font-medium transition ${
-                  engine === 'ocr' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-                }`}
-              >
-                Free OCR
               </button>
               <button
                 type="button"
@@ -172,12 +199,6 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                 , or use a free option instead.
               </p>
             )}
-            {engine === 'ocr' && (
-              <p className="mt-2 text-xs text-slate-400">
-                Runs entirely in your browser, no key needed — but it's plain text recognition, so it's less reliable
-                at telling items apart from tax/tip/totals. Review carefully before applying.
-              </p>
-            )}
             {engine === 'paste' && (
               <p className="mt-2 text-xs text-slate-400">
                 Copy this prompt into ChatGPT, Claude, or any AI with vision, along with a photo of your receipt,
@@ -186,9 +207,9 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
             )}
             {engine === 'livetext' && (
               <p className="mt-2 text-xs text-slate-400">
-                Your phone's own text scanner reads photos much better than the free OCR above. Open the receipt
-                photo, use it to select and copy all the text (iPhone: Live Text — tap the text-select icon in
-                Photos; Android: Google Lens), then paste the raw result below. We'll pick out the items ourselves.
+                Your phone's own text scanner reads photos better than we can in-browser. Open the receipt photo,
+                use it to select and copy all the text (iPhone: Live Text — tap the text-select icon in Photos;
+                Android: Google Lens), then paste the raw result below. We'll pick out the items ourselves.
               </p>
             )}
 
@@ -209,6 +230,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                 <textarea
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
+                  onPaste={pasteNormalizingHandler(setPasteText)}
                   placeholder="Paste the AI's reply here…"
                   rows={6}
                   className="mt-3 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
@@ -228,6 +250,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                 <textarea
                   value={liveText}
                   onChange={(e) => setLiveText(e.target.value)}
+                  onPaste={pasteNormalizingHandler(setLiveText)}
                   placeholder="Paste the scanned receipt text here…"
                   rows={8}
                   className="w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
@@ -263,11 +286,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                   {status === 'loading' ? (
                     <>
                       <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-                      <span className="text-sm">
-                        {engine === 'ocr'
-                          ? `Reading your receipt on-device… ${Math.round(ocrProgress * 100)}%`
-                          : 'Reading your receipt…'}
-                      </span>
+                      <span className="text-sm">Reading your receipt…</span>
                     </>
                   ) : (
                     <>
@@ -287,12 +306,6 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
             <p className="text-sm text-slate-500">
               Review what we found, then apply it to your bill. Uncheck anything that isn&rsquo;t right.
             </p>
-            {usedEngine === 'ocr' && (
-              <p className="mt-1 text-xs text-amber-700">
-                Scanned with free on-device OCR — double-check names and prices, especially anything that isn&rsquo;t
-                a plain item line.
-              </p>
-            )}
             {usedEngine === 'livetext' && (
               <p className="mt-1 text-xs text-amber-700">
                 Character recognition should be solid, but double-check we picked out the right lines as items vs.
@@ -352,6 +365,16 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                   className="h-4 w-4 rounded border-slate-300"
                 />
                 Tip: {tipValue !== null ? formatCurrency(tipValue) : 'not found'}
+              </label>
+              <label className="col-span-2 flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={applyDate}
+                  disabled={dateValue === null}
+                  onChange={(e) => setApplyDate(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Date: {dateValue !== null ? formatDateOnly(dateValue) : 'not found'}
               </label>
             </div>
             {receipt?.total !== null && receipt?.total !== undefined && (

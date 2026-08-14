@@ -86,13 +86,19 @@ export default function App() {
     setState((prev) => ({ ...prev, paid: { ...prev.paid, [personId]: !prev.paid[personId] } }))
   }
 
-  function applyScan(result: { items: { name: string; price: number }[]; tax: number | null; tip: number | null }) {
+  function applyScan(result: {
+    items: { name: string; price: number }[]
+    tax: number | null
+    tip: number | null
+    date: string | null
+  }) {
     setState((prev) => ({
       ...prev,
       items: [...prev.items, ...result.items.map((item) => ({ id: uid(), name: item.name, price: item.price, assignedTo: [] }))],
       tax: result.tax !== null ? result.tax : prev.tax,
       tipMode: result.tip !== null ? 'amount' : prev.tipMode,
       tipValue: result.tip !== null ? result.tip : prev.tipValue,
+      date: result.date ?? prev.date,
     }))
   }
 
