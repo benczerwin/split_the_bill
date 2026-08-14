@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
 import type { ClipboardEvent } from 'react'
 import { fileToBase64, scanReceipt, type ScannedReceipt } from '../lib/receiptScan'
-import { parseReceiptText } from '../lib/receiptTextParser'
 import { PASTE_PROMPT, parsePastedReceiptText } from '../lib/pasteParse'
 import { formatCurrency } from '../lib/calculations'
 import { formatDateOnly } from '../lib/dateUtils'
@@ -26,7 +25,7 @@ interface DraftItem {
 }
 
 type Status = 'idle' | 'loading' | 'error' | 'ready'
-type Engine = 'claude' | 'paste' | 'livetext'
+type Engine = 'claude' | 'paste'
 
 /**
  * A partial (drag) selection copy of iOS Live Text can land on the clipboard URL-encoded
@@ -48,7 +47,6 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
   const [pasteText, setPasteText] = useState('')
-  const [liveText, setLiveText] = useState('')
   const [promptCopied, setPromptCopied] = useState(false)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([])
   const [taxValue, setTaxValue] = useState<number | null>(null)
@@ -58,11 +56,9 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
   const [applyTip, setApplyTip] = useState(true)
   const [applyDate, setApplyDate] = useState(true)
   const [receipt, setReceipt] = useState<ScannedReceipt | null>(null)
-  const [usedEngine, setUsedEngine] = useState<Engine>(engine)
   const inputRef = useRef<HTMLInputElement>(null)
 
   function applyResult(result: ScannedReceipt) {
-    setUsedEngine(engine)
     setReceipt(result)
     setDraftItems(result.items.map((item) => ({ ...item, include: true })))
     setTaxValue(result.tax)
@@ -95,38 +91,22 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
     })
   }
 
-  function pasteNormalizingHandler(setter: (value: string) => void) {
-    return (e: ClipboardEvent<HTMLTextAreaElement>) => {
-      const raw = e.clipboardData.getData('text/plain')
-      if (!raw) return
-      const normalized = normalizePastedText(raw)
-      if (normalized === raw) return // let the default paste happen unmodified
-      e.preventDefault()
-      const el = e.currentTarget
-      const start = el.selectionStart ?? el.value.length
-      const end = el.selectionEnd ?? el.value.length
-      setter(el.value.slice(0, start) + normalized + el.value.slice(end))
-    }
+  function handlePasteTextChange(e: ClipboardEvent<HTMLTextAreaElement>) {
+    const raw = e.clipboardData.getData('text/plain')
+    if (!raw) return
+    const normalized = normalizePastedText(raw)
+    if (normalized === raw) return // let the default paste happen unmodified
+    e.preventDefault()
+    const el = e.currentTarget
+    const start = el.selectionStart ?? el.value.length
+    const end = el.selectionEnd ?? el.value.length
+    setPasteText(el.value.slice(0, start) + normalized + el.value.slice(end))
   }
 
   function handleParsePaste() {
     setError('')
     try {
       applyResult(parsePastedReceiptText(pasteText))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not parse that text.')
-      setStatus('error')
-    }
-  }
-
-  function handleParseLiveText() {
-    setError('')
-    try {
-      const result = parseReceiptText(liveText)
-      if (result.items.length === 0) {
-        throw new Error('No item lines found in that text — make sure you copied the whole receipt.')
-      }
-      applyResult(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not parse that text.')
       setStatus('error')
@@ -148,8 +128,14 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-800">Scan a receipt</h2>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
@@ -159,7 +145,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
 
         {status !== 'ready' && (
           <div className="mt-4">
-            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 text-xs">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-xs">
               <button
                 type="button"
                 onClick={() => apiKey && setEngine('claude')}
@@ -179,15 +165,6 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
               >
                 Paste from AI
               </button>
-              <button
-                type="button"
-                onClick={() => setEngine('livetext')}
-                className={`rounded-md py-1.5 font-medium transition ${
-                  engine === 'livetext' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-                }`}
-              >
-                Paste scanned text
-              </button>
             </div>
 
             {engine === 'claude' && !apiKey && (
@@ -196,20 +173,13 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                 <button type="button" onClick={onOpenSettings} className="font-medium underline">
                   Add one in Settings
                 </button>
-                , or use a free option instead.
+                , or use the free option instead.
               </p>
             )}
             {engine === 'paste' && (
               <p className="mt-2 text-xs text-slate-400">
                 Copy this prompt into ChatGPT, Claude, or any AI with vision, along with a photo of your receipt,
                 then paste its reply below.
-              </p>
-            )}
-            {engine === 'livetext' && (
-              <p className="mt-2 text-xs text-slate-400">
-                Your phone's own text scanner reads photos better than we can in-browser. Open the receipt photo,
-                use it to select and copy all the text (iPhone: Live Text — tap the text-select icon in Photos;
-                Android: Google Lens), then paste the raw result below. We'll pick out the items ourselves.
               </p>
             )}
 
@@ -230,7 +200,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                 <textarea
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
-                  onPaste={pasteNormalizingHandler(setPasteText)}
+                  onPaste={handlePasteTextChange}
                   placeholder="Paste the AI's reply here…"
                   rows={6}
                   className="mt-3 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
@@ -239,26 +209,6 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                   type="button"
                   onClick={handleParsePaste}
                   disabled={!pasteText.trim()}
-                  className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Parse pasted text
-                </button>
-                {status === 'error' && <p className="mt-3 text-sm text-red-600">{error}</p>}
-              </div>
-            ) : engine === 'livetext' ? (
-              <div className="mt-3">
-                <textarea
-                  value={liveText}
-                  onChange={(e) => setLiveText(e.target.value)}
-                  onPaste={pasteNormalizingHandler(setLiveText)}
-                  placeholder="Paste the scanned receipt text here…"
-                  rows={8}
-                  className="w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleParseLiveText}
-                  disabled={!liveText.trim()}
                   className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Parse pasted text
@@ -306,12 +256,6 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
             <p className="text-sm text-slate-500">
               Review what we found, then apply it to your bill. Uncheck anything that isn&rsquo;t right.
             </p>
-            {usedEngine === 'livetext' && (
-              <p className="mt-1 text-xs text-amber-700">
-                Character recognition should be solid, but double-check we picked out the right lines as items vs.
-                tax/tip.
-              </p>
-            )}
             <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
               {draftItems.map((item, index) => (
                 <div key={index} className="flex items-center gap-2">
