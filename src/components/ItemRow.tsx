@@ -42,8 +42,9 @@ export default function ItemRow({ item, people, onChange, onDelete }: ItemRowPro
             type="number"
             inputMode="decimal"
             step="0.01"
-            value={Number.isFinite(item.price) ? item.price : ''}
+            value={item.price === 0 ? '' : item.price}
             onChange={(e) => onChange({ price: e.target.valueAsNumber || 0 })}
+            onFocus={(e) => e.target.select()}
             placeholder="0.00"
             className="w-full rounded-lg border border-slate-300 py-1.5 pl-5 pr-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />

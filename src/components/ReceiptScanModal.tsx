@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import { fileToBase64, scanReceipt, type ScannedReceipt } from '../lib/receiptScan'
+import { scanReceiptOCR } from '../lib/ocrScan'
 import { formatCurrency } from '../lib/calculations'
+import { CameraIcon } from './icons'
 
 interface ReceiptScanModalProps {
   apiKey: string
@@ -16,24 +18,36 @@ interface DraftItem {
 }
 
 type Status = 'idle' | 'loading' | 'error' | 'ready'
+type Engine = 'claude' | 'ocr'
 
 export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onApply }: ReceiptScanModalProps) {
+  const [engine, setEngine] = useState<Engine>(apiKey ? 'claude' : 'ocr')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
+  const [ocrProgress, setOcrProgress] = useState(0)
   const [draftItems, setDraftItems] = useState<DraftItem[]>([])
   const [taxValue, setTaxValue] = useState<number | null>(null)
   const [tipValue, setTipValue] = useState<number | null>(null)
   const [applyTax, setApplyTax] = useState(true)
   const [applyTip, setApplyTip] = useState(true)
   const [receipt, setReceipt] = useState<ScannedReceipt | null>(null)
+  const [usedEngine, setUsedEngine] = useState<Engine>(engine)
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleFile(file: File) {
     setStatus('loading')
     setError('')
+    setOcrProgress(0)
     try {
-      const { base64, mediaType } = await fileToBase64(file)
-      const result = await scanReceipt(apiKey, base64, mediaType)
+      const result =
+        engine === 'claude'
+          ? await (async () => {
+              if (!apiKey) throw new Error('Add your Anthropic API key in Settings first.')
+              const { base64, mediaType } = await fileToBase64(file)
+              return scanReceipt(apiKey, base64, mediaType)
+            })()
+          : await scanReceiptOCR(file, setOcrProgress)
+      setUsedEngine(engine)
       setReceipt(result)
       setDraftItems(result.items.map((item) => ({ ...item, include: true })))
       setTaxValue(result.tax)
@@ -68,18 +82,46 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
           </button>
         </div>
 
-        {!apiKey && (
-          <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
-            You need an Anthropic API key to scan receipts.{' '}
-            <button type="button" onClick={onOpenSettings} className="font-medium underline">
-              Add one in Settings
-            </button>
-            .
-          </div>
-        )}
-
-        {apiKey && status !== 'ready' && (
+        {status !== 'ready' && (
           <div className="mt-4">
+            <div className="flex rounded-lg bg-slate-100 p-1 text-sm">
+              <button
+                type="button"
+                onClick={() => apiKey && setEngine('claude')}
+                disabled={!apiKey}
+                className={`flex-1 rounded-md py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                  engine === 'claude' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                Claude (accurate)
+              </button>
+              <button
+                type="button"
+                onClick={() => setEngine('ocr')}
+                className={`flex-1 rounded-md py-1.5 font-medium transition ${
+                  engine === 'ocr' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                Free on-device OCR
+              </button>
+            </div>
+
+            {engine === 'claude' && !apiKey && (
+              <p className="mt-2 text-xs text-amber-700">
+                Needs an Anthropic API key.{' '}
+                <button type="button" onClick={onOpenSettings} className="font-medium underline">
+                  Add one in Settings
+                </button>
+                , or use the free option instead.
+              </p>
+            )}
+            {engine === 'ocr' && (
+              <p className="mt-2 text-xs text-slate-400">
+                Runs entirely in your browser, no key needed — but it's plain text recognition, so it's less reliable
+                at telling items apart from tax/tip/totals. Review carefully before applying.
+              </p>
+            )}
+
             <input
               ref={inputRef}
               type="file"
@@ -95,16 +137,20 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
               type="button"
               onClick={() => inputRef.current?.click()}
               disabled={status === 'loading'}
-              className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-10 text-slate-500 hover:border-slate-400 disabled:opacity-60"
+              className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-10 text-slate-500 hover:border-slate-400 disabled:opacity-60"
             >
               {status === 'loading' ? (
                 <>
                   <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-                  <span className="text-sm">Reading your receipt…</span>
+                  <span className="text-sm">
+                    {engine === 'ocr'
+                      ? `Reading your receipt on-device… ${Math.round(ocrProgress * 100)}%`
+                      : 'Reading your receipt…'}
+                  </span>
                 </>
               ) : (
                 <>
-                  <span className="text-2xl">📷</span>
+                  <CameraIcon className="h-7 w-7" />
                   <span className="text-sm font-medium">Take a photo or choose a file</span>
                 </>
               )}
@@ -118,6 +164,12 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
             <p className="text-sm text-slate-500">
               Review what we found, then apply it to your bill. Uncheck anything that isn&rsquo;t right.
             </p>
+            {usedEngine === 'ocr' && (
+              <p className="mt-1 text-xs text-amber-700">
+                Scanned with free on-device OCR — double-check names and prices, especially anything that isn&rsquo;t
+                a plain item line.
+              </p>
+            )}
             <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
               {draftItems.map((item, index) => (
                 <div key={index} className="flex items-center gap-2">
@@ -140,8 +192,9 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                     <input
                       type="number"
                       step="0.01"
-                      value={item.price}
+                      value={item.price === 0 ? '' : item.price}
                       onChange={(e) => updateDraft(index, { price: e.target.valueAsNumber || 0 })}
+                      onFocus={(e) => e.target.select()}
                       className="w-full rounded-lg border border-slate-300 py-1 pl-5 pr-2 text-sm"
                     />
                   </div>

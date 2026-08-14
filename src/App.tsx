@@ -8,6 +8,7 @@ import TaxTipPanel from './components/TaxTipPanel'
 import ResultsPanel from './components/ResultsPanel'
 import SettingsModal from './components/SettingsModal'
 import ReceiptScanModal from './components/ReceiptScanModal'
+import { GearIcon } from './components/icons'
 
 function uid(): string {
   return crypto.randomUUID()
@@ -19,7 +20,7 @@ function makeDefaultState(): BillState {
     items: [],
     tax: 0,
     tipMode: 'percent',
-    tipValue: 18,
+    tipValue: 20,
     cashBackPercent: 4,
     paid: {},
   }
@@ -99,7 +100,7 @@ export default function App() {
             className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             aria-label="Settings"
           >
-            ⚙️
+            <GearIcon className="h-5 w-5" />
           </button>
         </div>
       </header>
