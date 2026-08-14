@@ -9,6 +9,7 @@ export interface ScannedReceipt {
   tip: number | null
   subtotal: number | null
   total: number | null
+  date: string | null
 }
 
 const MODEL = 'claude-sonnet-5'
@@ -16,8 +17,8 @@ const MODEL = 'claude-sonnet-5'
 const SYSTEM_PROMPT = `You extract structured data from photos of restaurant/bar receipts.
 Read every line item you can see, including its exact name and price (before tax/tip).
 Also find the tax amount and tip amount if printed on the receipt (tip is often blank — if
-you don't see one printed, return null for it, don't guess). Ignore the header/footer,
-payment card info, and loyalty text.
+you don't see one printed, return null for it, don't guess), and the date printed on the
+receipt if there is one. Ignore the header/footer, payment card info, and loyalty text.
 
 Respond with ONLY a single JSON object, no prose, no markdown fences, matching exactly:
 {
@@ -25,10 +26,13 @@ Respond with ONLY a single JSON object, no prose, no markdown fences, matching e
   "subtotal": number | null,
   "tax": number | null,
   "tip": number | null,
-  "total": number | null
+  "total": number | null,
+  "date": string | null
 }
-All numbers are plain decimal dollar amounts (no currency symbols). If a value is not present
-on the receipt, use null. If a line item's price is ambiguous, make your best estimate.`
+All numbers are plain decimal dollar amounts (no currency symbols). "date" must be formatted
+as "YYYY-MM-DD" (converting whatever format is printed), or null if no date is visible. If a
+value is not present on the receipt, use null. If a line item's price is ambiguous, make your
+best estimate.`
 
 function extractJson(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
@@ -105,12 +109,15 @@ export async function scanReceipt(apiKey: string, base64Image: string, mediaType
   const toNumberOrNull = (value: unknown): number | null =>
     typeof value === 'number' && Number.isFinite(value) ? value : null
 
+  const date = typeof raw.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.date) ? raw.date : null
+
   return {
     items,
     subtotal: toNumberOrNull(raw.subtotal),
     tax: toNumberOrNull(raw.tax),
     tip: toNumberOrNull(raw.tip),
     total: toNumberOrNull(raw.total),
+    date,
   }
 }
 
