@@ -11,13 +11,13 @@ const RIGHT = WIDTH - MARGIN
 const CENTER = WIDTH / 2
 const CONTENT_WIDTH = WIDTH - MARGIN * 2
 
-function slugify(title: string): string {
-  const slug = title
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return slug || 'split-the-bill'
+function buildFilename(state: BillState): string {
+  const datePart = state.date || undefined
+  const titlePart = state.title.trim() || 'Split the Bill'
+  const name = datePart ? `${datePart} ${titlePart}` : titlePart
+  // Strip characters that are invalid in filenames on Windows/macOS/Linux; keep everything else
+  // (spaces, punctuation) so the name stays human-readable rather than turning into a slug.
+  return `${name.replace(/[\\/:*?"<>|]/g, '-').trim()}.pdf`
 }
 
 function mmPerLine(fontSize: number): number {
@@ -190,5 +190,5 @@ export async function exportBillPDF(state: BillState, summary: SplitSummary): Pr
   const doc = new jsPDF({ unit: 'mm', format: [WIDTH, Math.max(measuredHeight, 120)] })
   render(doc, state, summary, qrDataUrl)
 
-  doc.save(`${slugify(state.title)}.pdf`)
+  doc.save(buildFilename(state))
 }
