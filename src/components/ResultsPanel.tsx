@@ -17,11 +17,11 @@ export default function ResultsPanel({ summary, tax, paid, onTogglePaid }: Resul
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
       <h2 className="text-base font-semibold text-slate-800">Who owes what</h2>
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4 overflow-x-auto overscroll-x-contain">
         <table className="w-full min-w-[560px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-              <th className="sticky left-0 z-10 border-r border-slate-200 bg-white py-2 pr-6 font-medium shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+              <th className="sticky left-0 z-10 [transform:translateZ(0)] will-change-transform border-r border-slate-200 bg-white py-2 pr-6 font-medium shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                 Person
               </th>
               <th className="py-2 pl-3 pr-3 font-medium">% of meal</th>
@@ -34,7 +34,7 @@ export default function ResultsPanel({ summary, tax, paid, onTogglePaid }: Resul
           <tbody>
             {results.map((r) => (
               <tr key={r.person.id} className="border-b border-slate-100 last:border-0">
-                <td className="sticky left-0 z-10 border-r border-slate-200 bg-white py-2.5 pr-6 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                <td className="sticky left-0 z-10 [transform:translateZ(0)] will-change-transform border-r border-slate-200 bg-white py-2.5 pr-6 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                   <PersonTag name={r.person.name} colorIndex={r.person.colorIndex} size="sm" />
                 </td>
                 <td className="py-2.5 pl-3 pr-3 text-slate-500">{Math.round(r.shareFraction * 100)}%</td>

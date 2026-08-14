@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { BillState, Item } from './types'
 import { computeSplit } from './lib/calculations'
 import { loadApiKey, loadBillState, saveApiKey, saveBillState } from './lib/storage'
@@ -8,7 +8,7 @@ import TaxTipPanel from './components/TaxTipPanel'
 import ResultsPanel from './components/ResultsPanel'
 import SettingsModal from './components/SettingsModal'
 import ReceiptScanModal from './components/ReceiptScanModal'
-import { GearIcon } from './components/icons'
+import { DownloadIcon, GearIcon, UploadIcon } from './components/icons'
 
 function uid(): string {
   return crypto.randomUUID()
@@ -16,6 +16,7 @@ function uid(): string {
 
 function makeDefaultState(): BillState {
   return {
+    title: '',
     people: [],
     items: [],
     tax: 0,
@@ -27,10 +28,14 @@ function makeDefaultState(): BillState {
 }
 
 export default function App() {
-  const [state, setState] = useState<BillState>(() => loadBillState() ?? makeDefaultState())
+  const [state, setState] = useState<BillState>(() => ({ ...makeDefaultState(), ...loadBillState() }))
   const [apiKey, setApiKey] = useState(() => loadApiKey())
   const [showSettings, setShowSettings] = useState(false)
   const [showScan, setShowScan] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importNotice, setImportNotice] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     saveBillState(state)
@@ -86,6 +91,37 @@ export default function App() {
     }))
   }
 
+  async function handleExport() {
+    setIsExporting(true)
+    try {
+      const { exportBillPDF } = await import('./lib/pdfExport')
+      await exportBillPDF(state, summary)
+    } catch (err) {
+      setImportNotice({ kind: 'error', message: err instanceof Error ? err.message : 'Could not generate the PDF.' })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  async function handleImportFile(file: File) {
+    if (state.people.length > 0 || state.items.length > 0) {
+      const confirmed = window.confirm('Importing will replace the current bill. Continue?')
+      if (!confirmed) return
+    }
+    setIsImporting(true)
+    setImportNotice(null)
+    try {
+      const { importBillFromPDF } = await import('./lib/pdfImport')
+      const imported = await importBillFromPDF(file)
+      setState(imported)
+      setImportNotice({ kind: 'success', message: imported.title ? `Imported "${imported.title}".` : 'Bill imported.' })
+    } catch (err) {
+      setImportNotice({ kind: 'error', message: err instanceof Error ? err.message : 'Could not import that PDF.' })
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 pb-16">
       <header className="border-b border-slate-200 bg-white">
@@ -94,18 +130,81 @@ export default function App() {
             <h1 className="text-lg font-bold text-slate-900">Split the Bill</h1>
             <p className="text-xs text-slate-400">Fairly split a bill by item, including tax, tip &amp; cash back.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowSettings(true)}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Settings"
-          >
-            <GearIcon className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) handleImportFile(file)
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              disabled={isImporting}
+              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+              aria-label="Import bill from PDF"
+              title="Import bill from PDF"
+            >
+              {isImporting ? (
+                <span className="block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              ) : (
+                <UploadIcon className="h-5 w-5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={isExporting}
+              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+              aria-label="Export bill as PDF"
+              title="Export bill as PDF"
+            >
+              {isExporting ? (
+                <span className="block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              ) : (
+                <DownloadIcon className="h-5 w-5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Settings"
+            >
+              <GearIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </header>
 
+      {importNotice && (
+        <div className="mx-auto mt-4 max-w-3xl px-4">
+          <div
+            className={`flex items-center justify-between rounded-lg px-4 py-2 text-sm ${
+              importNotice.kind === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+            }`}
+          >
+            <span>{importNotice.message}</span>
+            <button type="button" onClick={() => setImportNotice(null)} className="ml-3 opacity-60 hover:opacity-100">
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="mx-auto mt-6 flex max-w-3xl flex-col gap-6 px-4">
+        <input
+          type="text"
+          value={state.title}
+          onChange={(e) => setState((prev) => ({ ...prev, title: e.target.value }))}
+          placeholder="Untitled bill (e.g. Friday Dinner)"
+          className="rounded-xl border border-transparent bg-transparent px-1 py-1 text-xl font-semibold text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:px-3 focus:py-2 focus:outline-none focus:ring-1 focus:ring-slate-300"
+        />
         <PeopleManager people={state.people} onAdd={addPerson} onRemove={removePerson} />
         <ItemsList
           items={state.items}
