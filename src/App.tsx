@@ -1,0 +1,155 @@
+import { useEffect, useState } from 'react'
+import type { BillState, Item } from './types'
+import { computeSplit } from './lib/calculations'
+import { loadApiKey, loadBillState, saveApiKey, saveBillState } from './lib/storage'
+import PeopleManager from './components/PeopleManager'
+import ItemsList from './components/ItemsList'
+import TaxTipPanel from './components/TaxTipPanel'
+import ResultsPanel from './components/ResultsPanel'
+import SettingsModal from './components/SettingsModal'
+import ReceiptScanModal from './components/ReceiptScanModal'
+
+function uid(): string {
+  return crypto.randomUUID()
+}
+
+function makeDefaultState(): BillState {
+  return {
+    people: [],
+    items: [],
+    tax: 0,
+    tipMode: 'percent',
+    tipValue: 18,
+    cashBackPercent: 4,
+    paid: {},
+  }
+}
+
+export default function App() {
+  const [state, setState] = useState<BillState>(() => loadBillState() ?? makeDefaultState())
+  const [apiKey, setApiKey] = useState(() => loadApiKey())
+  const [showSettings, setShowSettings] = useState(false)
+  const [showScan, setShowScan] = useState(false)
+
+  useEffect(() => {
+    saveBillState(state)
+  }, [state])
+
+  const summary = computeSplit(state)
+
+  function addPerson(name: string) {
+    setState((prev) => ({
+      ...prev,
+      people: [...prev.people, { id: uid(), name, colorIndex: prev.people.length }],
+    }))
+  }
+
+  function removePerson(id: string) {
+    setState((prev) => ({
+      ...prev,
+      people: prev.people.filter((p) => p.id !== id),
+      items: prev.items.map((item) => ({ ...item, assignedTo: item.assignedTo.filter((pid) => pid !== id) })),
+      paid: Object.fromEntries(Object.entries(prev.paid).filter(([pid]) => pid !== id)),
+    }))
+  }
+
+  function addItem() {
+    setState((prev) => ({
+      ...prev,
+      items: [...prev.items, { id: uid(), name: '', price: 0, assignedTo: [] }],
+    }))
+  }
+
+  function changeItem(id: string, patch: Partial<Item>) {
+    setState((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    }))
+  }
+
+  function deleteItem(id: string) {
+    setState((prev) => ({ ...prev, items: prev.items.filter((item) => item.id !== id) }))
+  }
+
+  function togglePaid(personId: string) {
+    setState((prev) => ({ ...prev, paid: { ...prev.paid, [personId]: !prev.paid[personId] } }))
+  }
+
+  function applyScan(result: { items: { name: string; price: number }[]; tax: number | null; tip: number | null }) {
+    setState((prev) => ({
+      ...prev,
+      items: [...prev.items, ...result.items.map((item) => ({ id: uid(), name: item.name, price: item.price, assignedTo: [] }))],
+      tax: result.tax !== null ? result.tax : prev.tax,
+      tipMode: result.tip !== null ? 'amount' : prev.tipMode,
+      tipValue: result.tip !== null ? result.tip : prev.tipValue,
+    }))
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-100 pb-16">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
+          <div>
+            <h1 className="text-lg font-bold text-slate-900">Split the Bill</h1>
+            <p className="text-xs text-slate-400">Fairly split a bill by item, including tax, tip &amp; cash back.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowSettings(true)}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Settings"
+          >
+            ⚙️
+          </button>
+        </div>
+      </header>
+
+      <main className="mx-auto mt-6 flex max-w-3xl flex-col gap-6 px-4">
+        <PeopleManager people={state.people} onAdd={addPerson} onRemove={removePerson} />
+        <ItemsList
+          items={state.items}
+          people={state.people}
+          subtotal={summary.subtotal}
+          onAdd={addItem}
+          onChange={changeItem}
+          onDelete={deleteItem}
+          onScanReceipt={() => setShowScan(true)}
+        />
+        <TaxTipPanel
+          tax={state.tax}
+          tipMode={state.tipMode}
+          tipValue={state.tipValue}
+          cashBackPercent={state.cashBackPercent}
+          onTaxChange={(tax) => setState((prev) => ({ ...prev, tax }))}
+          onTipModeChange={(tipMode) => setState((prev) => ({ ...prev, tipMode }))}
+          onTipValueChange={(tipValue) => setState((prev) => ({ ...prev, tipValue }))}
+          onCashBackChange={(cashBackPercent) => setState((prev) => ({ ...prev, cashBackPercent }))}
+        />
+        <ResultsPanel summary={summary} tax={state.tax} paid={state.paid} onTogglePaid={togglePaid} />
+      </main>
+
+      {showSettings && (
+        <SettingsModal
+          apiKey={apiKey}
+          onSave={(key) => {
+            setApiKey(key)
+            saveApiKey(key)
+          }}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showScan && (
+        <ReceiptScanModal
+          apiKey={apiKey}
+          onClose={() => setShowScan(false)}
+          onOpenSettings={() => {
+            setShowScan(false)
+            setShowSettings(true)
+          }}
+          onApply={applyScan}
+        />
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,200 @@
+import { useRef, useState } from 'react'
+import { fileToBase64, scanReceipt, type ScannedReceipt } from '../lib/receiptScan'
+import { formatCurrency } from '../lib/calculations'
+
+interface ReceiptScanModalProps {
+  apiKey: string
+  onClose: () => void
+  onOpenSettings: () => void
+  onApply: (result: { items: { name: string; price: number }[]; tax: number | null; tip: number | null }) => void
+}
+
+interface DraftItem {
+  name: string
+  price: number
+  include: boolean
+}
+
+type Status = 'idle' | 'loading' | 'error' | 'ready'
+
+export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onApply }: ReceiptScanModalProps) {
+  const [status, setStatus] = useState<Status>('idle')
+  const [error, setError] = useState('')
+  const [draftItems, setDraftItems] = useState<DraftItem[]>([])
+  const [taxValue, setTaxValue] = useState<number | null>(null)
+  const [tipValue, setTipValue] = useState<number | null>(null)
+  const [applyTax, setApplyTax] = useState(true)
+  const [applyTip, setApplyTip] = useState(true)
+  const [receipt, setReceipt] = useState<ScannedReceipt | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  async function handleFile(file: File) {
+    setStatus('loading')
+    setError('')
+    try {
+      const { base64, mediaType } = await fileToBase64(file)
+      const result = await scanReceipt(apiKey, base64, mediaType)
+      setReceipt(result)
+      setDraftItems(result.items.map((item) => ({ ...item, include: true })))
+      setTaxValue(result.tax)
+      setTipValue(result.tip)
+      setStatus('ready')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong scanning that receipt.')
+      setStatus('error')
+    }
+  }
+
+  function updateDraft(index: number, patch: Partial<DraftItem>) {
+    setDraftItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
+  }
+
+  function handleApply() {
+    onApply({
+      items: draftItems.filter((item) => item.include).map(({ name, price }) => ({ name, price })),
+      tax: applyTax ? taxValue : null,
+      tip: applyTip ? tipValue : null,
+    })
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-800">Scan a receipt</h2>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+            &times;
+          </button>
+        </div>
+
+        {!apiKey && (
+          <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
+            You need an Anthropic API key to scan receipts.{' '}
+            <button type="button" onClick={onOpenSettings} className="font-medium underline">
+              Add one in Settings
+            </button>
+            .
+          </div>
+        )}
+
+        {apiKey && status !== 'ready' && (
+          <div className="mt-4">
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleFile(file)
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={status === 'loading'}
+              className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-10 text-slate-500 hover:border-slate-400 disabled:opacity-60"
+            >
+              {status === 'loading' ? (
+                <>
+                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+                  <span className="text-sm">Reading your receipt…</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl">📷</span>
+                  <span className="text-sm font-medium">Take a photo or choose a file</span>
+                </>
+              )}
+            </button>
+            {status === 'error' && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          </div>
+        )}
+
+        {status === 'ready' && (
+          <div className="mt-4">
+            <p className="text-sm text-slate-500">
+              Review what we found, then apply it to your bill. Uncheck anything that isn&rsquo;t right.
+            </p>
+            <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+              {draftItems.map((item, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={item.include}
+                    onChange={(e) => updateDraft(index, { include: e.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  <input
+                    type="text"
+                    value={item.name}
+                    onChange={(e) => updateDraft(index, { name: e.target.value })}
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                  />
+                  <div className="relative w-24 shrink-0">
+                    <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-slate-400">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={item.price}
+                      onChange={(e) => updateDraft(index, { price: e.target.valueAsNumber || 0 })}
+                      className="w-full rounded-lg border border-slate-300 py-1 pl-5 pr-2 text-sm"
+                    />
+                  </div>
+                </div>
+              ))}
+              {draftItems.length === 0 && <p className="text-sm text-slate-400">No line items were found.</p>}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={applyTax}
+                  disabled={taxValue === null}
+                  onChange={(e) => setApplyTax(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Tax: {taxValue !== null ? formatCurrency(taxValue) : 'not found'}
+              </label>
+              <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={applyTip}
+                  disabled={tipValue === null}
+                  onChange={(e) => setApplyTip(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Tip: {tipValue !== null ? formatCurrency(tipValue) : 'not found'}
+              </label>
+            </div>
+            {receipt?.total !== null && receipt?.total !== undefined && (
+              <p className="mt-2 text-xs text-slate-400">Receipt total (for reference): {formatCurrency(receipt.total)}</p>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setStatus('idle')}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Rescan
+              </button>
+              <button
+                type="button"
+                onClick={handleApply}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              >
+                Add to bill
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
