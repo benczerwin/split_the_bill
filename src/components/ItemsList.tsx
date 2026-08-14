@@ -1,5 +1,6 @@
 import type { Item, Person } from '../types'
 import ItemRow from './ItemRow'
+import SwipeToDelete from './SwipeToDelete'
 import { formatCurrency } from '../lib/calculations'
 import { CameraIcon } from './icons'
 
@@ -28,18 +29,15 @@ export default function ItemsList({ items, people, subtotal, onAdd, onChange, on
         </button>
       </div>
       <p className="mt-1 text-xs text-slate-400">
-        Tap the &ldquo;Everyone&rdquo; pill or specific names to control who splits each item.
+        Tap the &ldquo;Everyone&rdquo; pill or specific names to control who splits each item. Swipe an item left to
+        delete it.
       </p>
 
       <div className="mt-4 space-y-3">
         {items.map((item) => (
-          <ItemRow
-            key={item.id}
-            item={item}
-            people={people}
-            onChange={(patch) => onChange(item.id, patch)}
-            onDelete={() => onDelete(item.id)}
-          />
+          <SwipeToDelete key={item.id} onDelete={() => onDelete(item.id)}>
+            <ItemRow item={item} people={people} onChange={(patch) => onChange(item.id, patch)} onDelete={() => onDelete(item.id)} />
+          </SwipeToDelete>
         ))}
         {items.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400">
