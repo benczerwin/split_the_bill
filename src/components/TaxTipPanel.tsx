@@ -22,16 +22,14 @@ export default function TaxTipPanel({
   onTipValueChange,
   onCashBackChange,
 }: TaxTipPanelProps) {
-  // Remembers the last nonzero tip so "No tip" (e.g. for a carry-out order) can be undone
-  // with one tap instead of retyping the value.
+  // Remembers the last nonzero tip so unchecking "Add tip" (e.g. for a carry-out order) and
+  // rechecking it later restores the value instead of leaving it at 0.
   const lastTipValue = useRef(tipValue > 0 ? tipValue : 20)
   useEffect(() => {
     if (tipValue > 0) lastTipValue.current = tipValue
   }, [tipValue])
 
-  function toggleTip() {
-    onTipValueChange(tipValue > 0 ? 0 : lastTipValue.current)
-  }
+  const tipEnabled = tipValue > 0
 
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
@@ -53,20 +51,22 @@ export default function TaxTipPanel({
           </div>
         </label>
 
-        <label className="block">
+        <div className="block">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">Tip</span>
-            <button
-              type="button"
-              onClick={toggleTip}
-              className="text-xs font-medium text-slate-500 hover:text-slate-800 hover:underline"
-            >
-              {tipValue > 0 ? 'No tip' : 'Add tip'}
-            </button>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              <input
+                type="checkbox"
+                checked={tipEnabled}
+                onChange={(e) => onTipValueChange(e.target.checked ? lastTipValue.current : 0)}
+                className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+              />
+              Add tip
+            </label>
           </div>
           <div
             className={`mt-1 flex rounded-lg border focus-within:border-slate-500 focus-within:ring-1 focus-within:ring-slate-500 ${
-              tipValue > 0 ? 'border-slate-300' : 'border-slate-200 bg-slate-50'
+              tipEnabled ? 'border-slate-300' : 'border-slate-200 bg-slate-100'
             }`}
           >
             <input
@@ -76,18 +76,20 @@ export default function TaxTipPanel({
               value={tipValue === 0 ? '' : tipValue}
               onChange={(e) => onTipValueChange(e.target.valueAsNumber || 0)}
               onFocus={(e) => e.target.select()}
-              className="w-full rounded-l-lg px-3 py-2 text-sm focus:outline-none"
+              disabled={!tipEnabled}
+              className="w-full rounded-l-lg bg-transparent px-3 py-2 text-sm focus:outline-none disabled:cursor-not-allowed disabled:text-slate-400"
             />
             <select
               value={tipMode}
               onChange={(e) => onTipModeChange(e.target.value as TipMode)}
-              className="rounded-r-lg border-l border-slate-300 bg-slate-50 px-2 text-sm text-slate-600 focus:outline-none"
+              disabled={!tipEnabled}
+              className="rounded-r-lg border-l border-slate-300 bg-slate-50 px-2 text-sm text-slate-600 focus:outline-none disabled:cursor-not-allowed disabled:text-slate-300"
             >
               <option value="amount">$</option>
               <option value="percent">%</option>
             </select>
           </div>
-        </label>
+        </div>
 
         <label className="block">
           <span className="text-xs font-medium text-slate-500">Cash back (%)</span>
