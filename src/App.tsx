@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { BillState, Item } from './types'
 import { computeSplit } from './lib/calculations'
 import { loadApiKey, loadBillState, saveApiKey, saveBillState } from './lib/storage'
@@ -9,7 +9,8 @@ import TaxTipPanel from './components/TaxTipPanel'
 import ResultsPanel from './components/ResultsPanel'
 import SettingsModal from './components/SettingsModal'
 import ReceiptScanModal from './components/ReceiptScanModal'
-import { DownloadIcon, GearIcon, TrashIcon, UploadIcon } from './components/icons'
+import CombineReceiptsModal from './components/CombineReceiptsModal'
+import HeaderMenu from './components/HeaderMenu'
 
 function uid(): string {
   return crypto.randomUUID()
@@ -37,10 +38,10 @@ export default function App() {
   const [apiKey, setApiKey] = useState(() => loadApiKey())
   const [showSettings, setShowSettings] = useState(false)
   const [showScan, setShowScan] = useState(false)
+  const [showCombine, setShowCombine] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [importNotice, setImportNotice] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
-  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     saveBillState(state)
@@ -150,64 +151,15 @@ export default function App() {
             <h1 className="text-lg font-bold text-slate-900">Split the Bill</h1>
             <p className="text-xs text-slate-400">Fairly split a bill by item, including tax, tip &amp; cash back.</p>
           </div>
-          <div className="flex items-center gap-1">
-            <input
-              ref={importInputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                e.target.value = ''
-                if (file) handleImportFile(file)
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => importInputRef.current?.click()}
-              disabled={isImporting}
-              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
-              aria-label="Import bill from PDF (replaces the current bill)"
-              title="Import bill from PDF — replaces the current bill"
-            >
-              {isImporting ? (
-                <span className="block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-              ) : (
-                <UploadIcon className="h-5 w-5" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={isExporting}
-              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
-              aria-label="Export bill as PDF"
-              title="Export bill as PDF"
-            >
-              {isExporting ? (
-                <span className="block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-              ) : (
-                <DownloadIcon className="h-5 w-5" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500"
-              aria-label="Clear all"
-              title="Clear all"
-            >
-              <TrashIcon className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowSettings(true)}
-              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              aria-label="Settings"
-            >
-              <GearIcon className="h-5 w-5" />
-            </button>
-          </div>
+          <HeaderMenu
+            isImporting={isImporting}
+            isExporting={isExporting}
+            onImportFile={handleImportFile}
+            onExport={handleExport}
+            onCombine={() => setShowCombine(true)}
+            onClearAll={handleClearAll}
+            onSettings={() => setShowSettings(true)}
+          />
         </div>
       </header>
 
@@ -287,6 +239,8 @@ export default function App() {
           onApply={applyScan}
         />
       )}
+
+      {showCombine && <CombineReceiptsModal onClose={() => setShowCombine(false)} />}
     </div>
   )
 }
