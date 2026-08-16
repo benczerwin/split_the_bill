@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { TipMode } from '../types'
 
 interface TaxTipPanelProps {
@@ -21,6 +22,17 @@ export default function TaxTipPanel({
   onTipValueChange,
   onCashBackChange,
 }: TaxTipPanelProps) {
+  // Remembers the last nonzero tip so "No tip" (e.g. for a carry-out order) can be undone
+  // with one tap instead of retyping the value.
+  const lastTipValue = useRef(tipValue > 0 ? tipValue : 20)
+  useEffect(() => {
+    if (tipValue > 0) lastTipValue.current = tipValue
+  }, [tipValue])
+
+  function toggleTip() {
+    onTipValueChange(tipValue > 0 ? 0 : lastTipValue.current)
+  }
+
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
       <h2 className="text-base font-semibold text-slate-800">Tax, tip &amp; cash back</h2>
@@ -42,8 +54,21 @@ export default function TaxTipPanel({
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-slate-500">Tip</span>
-          <div className="mt-1 flex rounded-lg border border-slate-300 focus-within:border-slate-500 focus-within:ring-1 focus-within:ring-slate-500">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Tip</span>
+            <button
+              type="button"
+              onClick={toggleTip}
+              className="text-xs font-medium text-slate-500 hover:text-slate-800 hover:underline"
+            >
+              {tipValue > 0 ? 'No tip' : 'Add tip'}
+            </button>
+          </div>
+          <div
+            className={`mt-1 flex rounded-lg border focus-within:border-slate-500 focus-within:ring-1 focus-within:ring-slate-500 ${
+              tipValue > 0 ? 'border-slate-300' : 'border-slate-200 bg-slate-50'
+            }`}
+          >
             <input
               type="number"
               inputMode="decimal"
