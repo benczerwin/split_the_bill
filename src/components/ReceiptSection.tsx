@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { CombineReceiptEntry } from '../types'
 import { formatCurrency } from '../lib/calculations'
 import { colorForIndex } from '../lib/palette'
+import { computeBillDisplay } from '../lib/currency'
 import PersonTag from './PersonTag'
 import { ChevronDownIcon, PencilIcon } from './icons'
 
@@ -11,6 +12,9 @@ interface ReceiptSectionProps {
    *  looks the same everywhere in Combine Receipts even though each bill assigned its own
    *  colors independently when it was created. */
   nameColorMap: Map<string, number>
+  /** USD-based exchange rates, if fetched — used to convert this receipt into its own charged
+   *  currency for display when it doesn't have an entered charged total. */
+  usdRates: Record<string, number> | null
   /** Briefly flashes then fades this card's background — used right after it's added/updated
    *  from the single-bill build/edit flows, so the change is noticeable but not jarring. */
   highlighted?: boolean
@@ -23,6 +27,7 @@ interface ReceiptSectionProps {
 export default function ReceiptSection({
   entry,
   nameColorMap,
+  usdRates,
   highlighted,
   onRemove,
   onEdit,
@@ -31,6 +36,8 @@ export default function ReceiptSection({
 }: ReceiptSectionProps) {
   const label = entry.status === 'done' && entry.bill ? entry.bill.title || entry.fileName : entry.fileName
   const canExpand = entry.status === 'done'
+  const display =
+    entry.status === 'done' && entry.bill && entry.summary ? computeBillDisplay(entry.bill, entry.summary, usdRates) : null
 
   // The animation only needs to run once per highlight — re-mounting the class on every
   // render (e.g. when other state in the list changes) would restart the flash repeatedly.
@@ -87,8 +94,13 @@ export default function ReceiptSection({
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6 text-xs text-slate-400">
           {entry.bill?.date && <span>{entry.bill.date}</span>}
-          {entry.status === 'done' && entry.summary && (
-            <span className="font-medium text-slate-600">{formatCurrency(entry.summary.totalWithTaxTip)}</span>
+          {display && (
+            <span className="font-medium text-slate-600">{formatCurrency(display.summary.totalWithTaxTip, display.currency)}</span>
+          )}
+          {display && entry.bill && display.currency !== entry.bill.currency && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+              charged in {display.currency}
+            </span>
           )}
           {entry.status === 'done' && !entry.payerId && (
             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">No payer</span>
@@ -143,7 +155,7 @@ export default function ReceiptSection({
                 {entry.bill.items.map((item) => (
                   <tr key={item.id} className="border-b border-slate-100 last:border-0">
                     <td className="py-1.5 pr-3 text-slate-700">{item.name || 'Untitled item'}</td>
-                    <td className="py-1.5 pr-3 text-slate-700">{formatCurrency(item.price)}</td>
+                    <td className="py-1.5 pr-3 text-slate-700">{formatCurrency(item.price, entry.bill?.currency)}</td>
                     <td className="py-1.5 pr-3 text-slate-500">
                       {item.assignedTo.length === 0
                         ? 'Everyone'
@@ -174,7 +186,7 @@ export default function ReceiptSection({
                 </tr>
               </thead>
               <tbody>
-                {entry.summary.results.map((r) => (
+                {(display?.summary.results ?? entry.summary.results).map((r) => (
                   <tr key={r.person.id} className="border-b border-slate-100 last:border-0">
                     <td className="py-1.5 pr-3">
                       <PersonTag
@@ -183,7 +195,9 @@ export default function ReceiptSection({
                         size="sm"
                       />
                     </td>
-                    <td className="py-1.5 pr-3 font-medium text-slate-900">{formatCurrency(r.costWithTaxTip)}</td>
+                    <td className="py-1.5 pr-3 font-medium text-slate-900">
+                      {formatCurrency(r.costWithTaxTip, display?.currency)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

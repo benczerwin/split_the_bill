@@ -13,6 +13,9 @@ export interface CompactBill {
   tv: number // tip value
   cb: number // cash back %
   pay?: number // payer index into `p`, omitted if unset (also absent on older exports)
+  cur?: string // bill currency code, defaults to 'USD' if absent (also absent on older exports)
+  ccur?: string | null // charged currency code, null/absent means same as `cur`
+  ctot?: number | null // actual amount charged in `ccur`, null/absent means unknown
 }
 
 export const BILL_QR_PREFIX = 'STB1:'
@@ -38,6 +41,9 @@ export function billStateToCompact(state: BillState): CompactBill {
     tv: state.tipValue,
     cb: state.cashBackPercent,
     pay: state.payerId ? indexOf.get(state.payerId) : undefined,
+    cur: state.currency,
+    ccur: state.chargedCurrency,
+    ctot: state.chargedTotal,
   }
 }
 
@@ -60,6 +66,9 @@ export function compactToBillState(compact: CompactBill): BillState {
     cashBackPercent: compact.cb,
     paid: {},
     payerId: compact.pay != null ? people[compact.pay]?.id ?? null : null,
+    currency: compact.cur ?? 'USD',
+    chargedCurrency: compact.ccur ?? null,
+    chargedTotal: compact.ctot ?? null,
   }
 }
 

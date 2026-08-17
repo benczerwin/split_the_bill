@@ -4,11 +4,12 @@ import { colorForIndex } from '../lib/palette'
 interface ItemRowProps {
   item: Item
   people: Person[]
+  currencySymbol: string
   onChange: (patch: Partial<Item>) => void
   onDelete: () => void
 }
 
-export default function ItemRow({ item, people, onChange, onDelete }: ItemRowProps) {
+export default function ItemRow({ item, people, currencySymbol, onChange, onDelete }: ItemRowProps) {
   const isEveryone = item.assignedTo.length === 0
 
   function toggleEveryone() {
@@ -36,8 +37,10 @@ export default function ItemRow({ item, people, onChange, onDelete }: ItemRowPro
           placeholder="Item name"
           className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         />
-        <div className="relative w-24 shrink-0">
-          <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-sm text-slate-400">$</span>
+        <div className="relative w-28 shrink-0">
+          <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-sm text-slate-400">
+            {currencySymbol}
+          </span>
           <input
             type="number"
             inputMode="decimal"
@@ -46,7 +49,7 @@ export default function ItemRow({ item, people, onChange, onDelete }: ItemRowPro
             onChange={(e) => onChange({ price: e.target.valueAsNumber || 0 })}
             onFocus={(e) => e.target.select()}
             placeholder="0.00"
-            className="w-full rounded-lg border border-slate-300 py-1.5 pl-5 pr-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+            className="w-full rounded-lg border border-slate-300 py-1.5 pl-8 pr-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
         </div>
         <button

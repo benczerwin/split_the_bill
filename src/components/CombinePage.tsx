@@ -1,11 +1,16 @@
 import { useRef } from 'react'
 import type { CombineState, SavedReceipt, SettleGroupBy } from '../types'
 import { formatCurrency } from '../lib/calculations'
+import { CURRENCIES } from '../lib/currency'
+import { useExchangeRates } from '../hooks/useExchangeRates'
 import {
   buildBalances,
   buildCombined,
   buildNameColorMap,
+  combineNeedsExchangeRates,
+  determineCombinedCurrency,
   groupSettlements,
+  scaleEntriesToCurrency,
   simplifySettlements,
   SETTLEMENT_EPSILON,
 } from '../lib/combineCalculations'
@@ -25,6 +30,7 @@ interface CombinePageProps {
   onSetPayer: (id: string, payerId: string | null) => void
   onCashBackPercentChange: (value: number) => void
   onSettleGroupByChange: (value: SettleGroupBy) => void
+  onCurrencyOverrideChange: (value: string | null) => void
   onAddFromLibrary: (ids: string[]) => void
   onEditLibraryItem: (id: string) => void
   onRemoveLibraryItem: (id: string) => void
@@ -43,6 +49,7 @@ export default function CombinePage({
   onSetPayer,
   onCashBackPercentChange,
   onSettleGroupByChange,
+  onCurrencyOverrideChange,
   onAddFromLibrary,
   onEditLibraryItem,
   onRemoveLibraryItem,
@@ -50,17 +57,25 @@ export default function CombinePage({
 }: CombinePageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { receipts, cashBackPercent, settleGroupBy } = combineState
+  const { receipts, cashBackPercent, settleGroupBy, currencyOverride } = combineState
   const doneEntries = receipts.filter((e) => e.status === 'done')
   const addedLibraryIds = new Set(receipts.map((e) => e.libraryId).filter((id): id is string => !!id))
 
+  const combinedCurrency = determineCombinedCurrency(receipts, currencyOverride)
+  const needsRates = combineNeedsExchangeRates(receipts, combinedCurrency)
+  const { rates, loading: ratesLoading, error: ratesError } = useExchangeRates(needsRates)
+  const scaledReceipts = scaleEntriesToCurrency(receipts, combinedCurrency, rates)
+
   const nameColorMap = buildNameColorMap(receipts)
-  const combined = buildCombined(receipts, nameColorMap, cashBackPercent)
+  const combined = buildCombined(scaledReceipts, nameColorMap, cashBackPercent)
   const grandTotal = combined.reduce((sum, p) => sum + p.total, 0)
-  const balances = buildBalances(receipts, combined, nameColorMap)
+  const balances = buildBalances(scaledReceipts, combined, nameColorMap)
   const settlements = simplifySettlements(balances)
   const groupedSettlements = groupSettlements(settlements, settleGroupBy)
   const missingPayerCount = doneEntries.filter((e) => !e.payerId).length
+  const mixedCurrencies = new Set(
+    doneEntries.map((e) => e.bill?.chargedCurrency ?? e.bill?.currency).filter((c): c is string => !!c),
+  ).size > 1
 
   // Checking a box adds that bill immediately; if it's already in the combine list, the same
   // checkbox doubles as a remove shortcut — no staging step, no separate "add selected" button.
@@ -176,6 +191,7 @@ export default function CombinePage({
                 key={entry.id}
                 entry={entry}
                 nameColorMap={nameColorMap}
+                usdRates={rates}
                 highlighted={entry.id === highlightReceiptId}
                 onRemove={() => onRemoveReceipt(entry.id)}
                 onEdit={() => onEditReceipt(entry.id)}
@@ -196,7 +212,7 @@ export default function CombinePage({
 
       {combined.length > 0 && (
         <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold text-slate-800">Combined totals</h2>
             <label className="flex items-center gap-1.5 text-xs text-slate-500">
               Cash back
@@ -215,6 +231,32 @@ export default function CombinePage({
               </div>
             </label>
           </div>
+
+          {mixedCurrencies && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              <span>
+                These receipts use different currencies — settling in{' '}
+                <span className="font-semibold text-slate-700">{combinedCurrency}</span>
+                {ratesLoading && ' (fetching today’s rates…)'}
+                {ratesError && ` (couldn't fetch today's rates: ${ratesError})`}
+              </span>
+              <label className="ml-auto flex items-center gap-1.5">
+                Settle in
+                <select
+                  value={currencyOverride ?? ''}
+                  onChange={(e) => onCurrencyOverrideChange(e.target.value || null)}
+                  className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                >
+                  <option value="">Auto ({determineCombinedCurrency(receipts, null)})</option>
+                  {CURRENCIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
 
           <div className="mt-3 flex items-start">
             {/* Frozen name column — a separate table outside the scroll area. Row heights are
@@ -260,13 +302,13 @@ export default function CombinePage({
                       {doneEntries.map((entry) => (
                         <td key={entry.id} className="pl-3 pr-3 text-slate-700">
                           {entry.id in p.perReceipt ? (
-                            formatCurrency(p.perReceipt[entry.id])
+                            formatCurrency(p.perReceipt[entry.id], combinedCurrency)
                           ) : (
                             <span className="text-slate-300">—</span>
                           )}
                         </td>
                       ))}
-                      <td className="pl-3 pr-3 font-semibold text-slate-900">{formatCurrency(p.total)}</td>
+                      <td className="pl-3 pr-3 font-semibold text-slate-900">{formatCurrency(p.total, combinedCurrency)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -278,7 +320,7 @@ export default function CombinePage({
             <span className="text-slate-500">
               {doneEntries.length} receipt{doneEntries.length === 1 ? '' : 's'} combined
             </span>
-            <span className="font-semibold text-slate-800">Grand total: {formatCurrency(grandTotal)}</span>
+            <span className="font-semibold text-slate-800">Grand total: {formatCurrency(grandTotal, combinedCurrency)}</span>
           </div>
 
           <div className="mt-6">
@@ -300,14 +342,14 @@ export default function CombinePage({
                       }`}
                     >
                       {b.net > SETTLEMENT_EPSILON
-                        ? `is owed ${formatCurrency(b.net)}`
+                        ? `is owed ${formatCurrency(b.net, combinedCurrency)}`
                         : b.net < -SETTLEMENT_EPSILON
-                          ? `owes ${formatCurrency(-b.net)}`
+                          ? `owes ${formatCurrency(-b.net, combinedCurrency)}`
                           : 'settled up'}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-400">
-                    paid {formatCurrency(b.paid)} · owes {formatCurrency(b.owed)}
+                    paid {formatCurrency(b.paid, combinedCurrency)} · owes {formatCurrency(b.owed, combinedCurrency)}
                   </p>
                 </div>
               ))}
@@ -361,7 +403,7 @@ export default function CombinePage({
                               </>
                             )}
                           </span>
-                          <span className="font-semibold text-slate-900">{formatCurrency(s.amount)}</span>
+                          <span className="font-semibold text-slate-900">{formatCurrency(s.amount, combinedCurrency)}</span>
                         </li>
                       ))}
                     </ul>

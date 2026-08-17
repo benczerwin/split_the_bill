@@ -1,4 +1,6 @@
 import type { CombineReceiptEntry, SettleGroupBy } from '../types'
+import { scaleSummary } from './calculations'
+import { combinedScaleForBill } from './currency'
 
 export interface CombinedPerson {
   key: string
@@ -121,6 +123,63 @@ export function simplifySettlements(balances: Balance[]): Settlement[] {
     if (debtor.amount <= SETTLEMENT_EPSILON) j++
   }
   return settlements
+}
+
+function mostCommon(values: string[]): string | null {
+  if (values.length === 0) return null
+  const counts = new Map<string, number>()
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)
+  let best = values[0]
+  let bestCount = 0
+  for (const [v, c] of counts) {
+    if (c > bestCount) {
+      best = v
+      bestCount = c
+    }
+  }
+  return best
+}
+
+/** Picks one settlement currency for the whole combine session. Prefers whatever currency
+ *  receipts were actually charged in (their entered bank total), since that's real money that
+ *  changed hands; falls back to the receipts' own bill currencies if none of them recorded a
+ *  charged total, and finally to USD if the session is empty. An explicit override always wins. */
+export function determineCombinedCurrency(entries: CombineReceiptEntry[], override?: string | null): string {
+  if (override) return override
+  const chargedCurrencies = entries
+    .filter((e) => e.status === 'done' && e.bill?.chargedTotal != null)
+    .map((e) => e.bill!.chargedCurrency ?? e.bill!.currency)
+  const pickedCharged = mostCommon(chargedCurrencies)
+  if (pickedCharged) return pickedCharged
+  const billCurrencies = entries.filter((e) => e.status === 'done' && e.bill).map((e) => e.bill!.currency)
+  return mostCommon(billCurrencies) ?? 'USD'
+}
+
+/** Whether combining this session's receipts into one currency requires a live exchange rate
+ *  (i.e. some receipt's own currency doesn't already match the combined currency and it has no
+ *  matching entered charged total to fall back on). */
+export function combineNeedsExchangeRates(entries: CombineReceiptEntry[], combinedCurrency: string): boolean {
+  return entries.some((e) => {
+    if (e.status !== 'done' || !e.bill) return false
+    const chargedCurrency = e.bill.chargedCurrency ?? e.bill.currency
+    if (e.bill.chargedTotal != null) return chargedCurrency !== combinedCurrency
+    return e.bill.currency !== combinedCurrency
+  })
+}
+
+/** Rewrites each entry's summary into the combined session's shared currency, so downstream
+ *  totals/balances can keep summing plain numbers as before. */
+export function scaleEntriesToCurrency(
+  entries: CombineReceiptEntry[],
+  combinedCurrency: string,
+  usdRates: Record<string, number> | null,
+): CombineReceiptEntry[] {
+  return entries.map((e) => {
+    if (e.status !== 'done' || !e.bill || !e.summary) return e
+    const scale = combinedScaleForBill(e.bill, e.summary.totalWithTaxTip, combinedCurrency, usdRates)
+    if (scale === 1) return e
+    return { ...e, summary: scaleSummary(e.summary, scale) }
+  })
 }
 
 export function groupSettlements(settlements: Settlement[], groupBy: SettleGroupBy): [string, Settlement[]][] {

@@ -5,11 +5,12 @@ import PersonTag from './PersonTag'
 interface ResultsPanelProps {
   summary: SplitSummary
   tax: number
+  currency: string
   paid: Record<string, boolean>
   onTogglePaid: (personId: string) => void
 }
 
-export default function ResultsPanel({ summary, tax, paid, onTogglePaid }: ResultsPanelProps) {
+export default function ResultsPanel({ summary, tax, currency, paid, onTogglePaid }: ResultsPanelProps) {
   const { subtotal, tipAmount, totalWithTaxTip, results, isBalanced } = summary
   const collected = results.reduce((sum, r) => (paid[r.person.id] ? sum + r.costWithTaxTip : sum), 0)
 
@@ -56,9 +57,9 @@ export default function ResultsPanel({ summary, tax, paid, onTogglePaid }: Resul
               {results.map((r) => (
                 <tr key={r.person.id} className="h-11 border-b border-slate-100 last:border-0">
                   <td className="pl-3 pr-3 text-slate-500">{Math.round(r.shareFraction * 100)}%</td>
-                  <td className="pr-3 text-slate-700">{formatCurrency(r.itemCost)}</td>
-                  <td className="pr-3 font-medium text-slate-900">{formatCurrency(r.costWithTaxTip)}</td>
-                  <td className="pr-3 font-medium text-emerald-600">{formatCurrency(r.costWithCashBack)}</td>
+                  <td className="pr-3 text-slate-700">{formatCurrency(r.itemCost, currency)}</td>
+                  <td className="pr-3 font-medium text-slate-900">{formatCurrency(r.costWithTaxTip, currency)}</td>
+                  <td className="pr-3 font-medium text-emerald-600">{formatCurrency(r.costWithCashBack, currency)}</td>
                   <td className="pr-3 text-center">
                     <input
                       type="checkbox"
@@ -84,19 +85,19 @@ export default function ResultsPanel({ summary, tax, paid, onTogglePaid }: Resul
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 text-sm sm:grid-cols-4">
         <div>
           <p className="text-xs text-slate-400">Subtotal</p>
-          <p className="font-semibold text-slate-800">{formatCurrency(subtotal)}</p>
+          <p className="font-semibold text-slate-800">{formatCurrency(subtotal, currency)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-400">Tax</p>
-          <p className="font-semibold text-slate-800">{formatCurrency(tax)}</p>
+          <p className="font-semibold text-slate-800">{formatCurrency(tax, currency)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-400">Tip</p>
-          <p className="font-semibold text-slate-800">{formatCurrency(tipAmount)}</p>
+          <p className="font-semibold text-slate-800">{formatCurrency(tipAmount, currency)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-400">Total</p>
-          <p className="font-semibold text-slate-800">{formatCurrency(totalWithTaxTip)}</p>
+          <p className="font-semibold text-slate-800">{formatCurrency(totalWithTaxTip, currency)}</p>
         </div>
       </div>
 
@@ -105,8 +106,8 @@ export default function ResultsPanel({ summary, tax, paid, onTogglePaid }: Resul
           {isBalanced ? 'Splits reconcile with the bill total.' : "Splits don't add up to the total — check your entries."}
         </p>
         <p className="text-slate-500">
-          Collected so far: <span className="font-semibold text-slate-800">{formatCurrency(collected)}</span> /{' '}
-          {formatCurrency(totalWithTaxTip)}
+          Collected so far: <span className="font-semibold text-slate-800">{formatCurrency(collected, currency)}</span> /{' '}
+          {formatCurrency(totalWithTaxTip, currency)}
         </p>
       </div>
     </section>

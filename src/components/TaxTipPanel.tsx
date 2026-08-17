@@ -6,6 +6,7 @@ interface TaxTipPanelProps {
   tipMode: TipMode
   tipValue: number
   cashBackPercent: number
+  currencySymbol: string
   onTaxChange: (value: number) => void
   onTipModeChange: (mode: TipMode) => void
   onTipValueChange: (value: number) => void
@@ -17,6 +18,7 @@ export default function TaxTipPanel({
   tipMode,
   tipValue,
   cashBackPercent,
+  currencySymbol,
   onTaxChange,
   onTipModeChange,
   onTipValueChange,
@@ -66,7 +68,9 @@ export default function TaxTipPanel({
               taxEnabled ? 'border-slate-300' : 'border-slate-200 bg-slate-100'
             }`}
           >
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">$</span>
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">
+              {currencySymbol}
+            </span>
             <input
               type="number"
               inputMode="decimal"
@@ -114,7 +118,7 @@ export default function TaxTipPanel({
               disabled={!tipEnabled}
               className="rounded-r-lg border-l border-slate-300 bg-slate-50 px-2 text-sm text-slate-600 focus:outline-none disabled:cursor-not-allowed disabled:text-slate-300"
             >
-              <option value="amount">$</option>
+              <option value="amount">{currencySymbol}</option>
               <option value="percent">%</option>
             </select>
           </div>

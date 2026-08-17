@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { AppMode, BillState, CombineReceiptEntry, CombineState, Item, SettleGroupBy } from './types'
 import { computeSplit } from './lib/calculations'
+import { computeBillDisplay, convertAmount, getCurrencySymbol } from './lib/currency'
+import { useExchangeRates } from './hooks/useExchangeRates'
 import {
   addToReceiptLibrary,
   LIBRARY_LIMIT,
@@ -25,6 +27,7 @@ import ReceiptScanModal from './components/ReceiptScanModal'
 import CombinePage from './components/CombinePage'
 import HeaderMenu from './components/HeaderMenu'
 import PayerPicker from './components/PayerPicker'
+import CurrencyPanel from './components/CurrencyPanel'
 import { TrashIcon } from './components/icons'
 import { APP_VERSION } from './version'
 
@@ -46,11 +49,14 @@ function makeDefaultState(): BillState {
     cashBackPercent: 4,
     paid: {},
     payerId: null,
+    currency: 'USD',
+    chargedCurrency: null,
+    chargedTotal: null,
   }
 }
 
 function makeDefaultCombineState(): CombineState {
-  return { receipts: [], cashBackPercent: 0, settleGroupBy: 'payer' }
+  return { receipts: [], cashBackPercent: 0, settleGroupBy: 'payer', currencyOverride: null }
 }
 
 function makeExampleState(): BillState {
@@ -78,6 +84,9 @@ function makeExampleState(): BillState {
     cashBackPercent: 4,
     paid: {},
     payerId: alex,
+    currency: 'USD',
+    chargedCurrency: null,
+    chargedTotal: null,
   }
 }
 
@@ -118,6 +127,10 @@ export default function App() {
   }, [highlightReceiptId])
 
   const summary = computeSplit(state)
+  const needsLiveRate = !!state.chargedCurrency && state.chargedCurrency !== state.currency && state.chargedTotal == null
+  const { rates, loading: rateLoading, error: rateError } = useExchangeRates(needsLiveRate)
+  const liveRate = state.chargedCurrency && rates ? convertAmount(1, state.currency, state.chargedCurrency, rates) : null
+  const display = computeBillDisplay(state, summary, rates)
 
   function addPerson(name: string) {
     setState((prev) => ({
@@ -322,7 +335,12 @@ export default function App() {
         await exportBillPDF(state, summary)
       } else {
         const { exportCombinedPDF } = await import('./lib/pdfExport')
-        await exportCombinedPDF(combineState.receipts, combineState.cashBackPercent, combineState.settleGroupBy)
+        await exportCombinedPDF(
+          combineState.receipts,
+          combineState.cashBackPercent,
+          combineState.settleGroupBy,
+          combineState.currencyOverride,
+        )
       }
     } catch (err) {
       setImportNotice({ kind: 'error', message: err instanceof Error ? err.message : 'Could not generate the PDF.' })
@@ -373,7 +391,12 @@ export default function App() {
               : null,
           expanded: false,
         }))
-        setCombineState({ receipts, cashBackPercent: imported.cashBackPercent, settleGroupBy: imported.settleGroupBy })
+        setCombineState({
+          receipts,
+          cashBackPercent: imported.cashBackPercent,
+          settleGroupBy: imported.settleGroupBy,
+          currencyOverride: imported.currencyOverride,
+        })
         setImportNotice({ kind: 'success', message: `Imported ${receipts.length} receipt${receipts.length === 1 ? '' : 's'}.` })
       } catch (err) {
         setImportNotice({ kind: 'error', message: err instanceof Error ? err.message : 'Could not import that PDF.' })
@@ -461,6 +484,10 @@ export default function App() {
 
   function handleSettleGroupByChange(value: SettleGroupBy) {
     setCombineState((prev) => ({ ...prev, settleGroupBy: value }))
+  }
+
+  function handleCurrencyOverrideChange(value: string | null) {
+    setCombineState((prev) => ({ ...prev, currencyOverride: value }))
   }
 
   function handleRemoveLibraryItem(id: string) {
@@ -596,6 +623,7 @@ export default function App() {
               items={state.items}
               people={state.people}
               subtotal={summary.subtotal}
+              currency={state.currency}
               onAdd={addItem}
               onChange={changeItem}
               onDelete={deleteItem}
@@ -606,17 +634,35 @@ export default function App() {
               tipMode={state.tipMode}
               tipValue={state.tipValue}
               cashBackPercent={state.cashBackPercent}
+              currencySymbol={getCurrencySymbol(state.currency)}
               onTaxChange={(tax) => setState((prev) => ({ ...prev, tax }))}
               onTipModeChange={(tipMode) => setState((prev) => ({ ...prev, tipMode }))}
               onTipValueChange={(tipValue) => setState((prev) => ({ ...prev, tipValue }))}
               onCashBackChange={(cashBackPercent) => setState((prev) => ({ ...prev, cashBackPercent }))}
+            />
+            <CurrencyPanel
+              currency={state.currency}
+              chargedCurrency={state.chargedCurrency}
+              chargedTotal={state.chargedTotal}
+              onCurrencyChange={(currency) => setState((prev) => ({ ...prev, currency }))}
+              onChargedCurrencyChange={(chargedCurrency) => setState((prev) => ({ ...prev, chargedCurrency }))}
+              onChargedTotalChange={(chargedTotal) => setState((prev) => ({ ...prev, chargedTotal }))}
+              liveRate={liveRate}
+              liveRateLoading={rateLoading}
+              liveRateError={rateError}
             />
             <PayerPicker
               people={state.people}
               payerId={state.payerId}
               onChange={(payerId) => setState((prev) => ({ ...prev, payerId }))}
             />
-            <ResultsPanel summary={summary} tax={state.tax} paid={state.paid} onTogglePaid={togglePaid} />
+            <ResultsPanel
+              summary={display.summary}
+              tax={state.tax * display.scale}
+              currency={display.currency}
+              paid={state.paid}
+              onTogglePaid={togglePaid}
+            />
             <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200">
               <button
                 type="button"
@@ -662,6 +708,7 @@ export default function App() {
             onSetPayer={handleSetReceiptPayer}
             onCashBackPercentChange={handleCashBackPercentChange}
             onSettleGroupByChange={handleSettleGroupByChange}
+            onCurrencyOverrideChange={handleCurrencyOverrideChange}
             onAddFromLibrary={handleAddFromLibrary}
             onEditLibraryItem={handleEditLibraryItem}
             onRemoveLibraryItem={handleRemoveLibraryItem}
@@ -686,6 +733,7 @@ export default function App() {
       {showScan && (
         <ReceiptScanModal
           apiKey={apiKey}
+          currency={state.currency}
           onClose={() => setShowScan(false)}
           onOpenSettings={() => {
             setShowScan(false)

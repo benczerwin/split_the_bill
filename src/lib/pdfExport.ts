@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf'
 import QRCode from 'qrcode'
 import type { BillState, CombineReceiptEntry, SettleGroupBy, SplitSummary } from '../types'
 import { formatCurrency } from './calculations'
+import { fetchUsdRates, resolveBillDisplay } from './currency'
 import { encodeBillForQR } from './billCodec'
 import { encodeCombineMetaForQR } from './combineCodec'
 import { formatDateOnly } from './dateUtils'
@@ -9,7 +10,10 @@ import {
   buildBalances,
   buildCombined,
   buildNameColorMap,
+  combineNeedsExchangeRates,
+  determineCombinedCurrency,
   groupSettlements,
+  scaleEntriesToCurrency,
   simplifySettlements,
   SETTLEMENT_EPSILON,
 } from './combineCalculations'
@@ -53,7 +57,14 @@ function drawWrapped(
   return y + lines.length * mmPerLine(fontSize)
 }
 
-function render(doc: jsPDF, state: BillState, summary: SplitSummary, qrDataUrl: string): number {
+function render(
+  doc: jsPDF,
+  state: BillState,
+  summary: SplitSummary,
+  displayCurrency: string,
+  displaySummary: SplitSummary,
+  qrDataUrl: string,
+): number {
   let y = 10
 
   const dashedRule = () => {
@@ -91,7 +102,7 @@ function render(doc: jsPDF, state: BillState, summary: SplitSummary, qrDataUrl: 
     const startY = y
     const priceLines: string[] = doc.splitTextToSize(item.name || '(unnamed item)', nameWidth)
     doc.text(priceLines, MARGIN, y)
-    doc.text(formatCurrency(item.price), RIGHT, startY, { align: 'right' })
+    doc.text(formatCurrency(item.price, state.currency), RIGHT, startY, { align: 'right' })
     y += priceLines.length * mmPerLine(9)
 
     const who =
@@ -126,11 +137,15 @@ function render(doc: jsPDF, state: BillState, summary: SplitSummary, qrDataUrl: 
     doc.text(value, RIGHT, y, { align: 'right' })
     y += bold ? 5.5 : 4.5
   }
-  totalsRow('Subtotal', formatCurrency(summary.subtotal))
-  totalsRow('Tax', formatCurrency(state.tax))
-  totalsRow('Tip', formatCurrency(summary.tipAmount))
+  totalsRow('Subtotal', formatCurrency(summary.subtotal, state.currency))
+  totalsRow('Tax', formatCurrency(state.tax, state.currency))
+  totalsRow('Tip', formatCurrency(summary.tipAmount, state.currency))
   y += 0.5
-  totalsRow('TOTAL', formatCurrency(summary.totalWithTaxTip), true)
+  totalsRow('TOTAL', formatCurrency(summary.totalWithTaxTip, state.currency), true)
+  if (displayCurrency !== state.currency) {
+    y += 0.5
+    totalsRow('CHARGED', formatCurrency(displaySummary.totalWithTaxTip, displayCurrency), true)
+  }
   y += 1
   dashedRule()
   y += 6
@@ -140,7 +155,7 @@ function render(doc: jsPDF, state: BillState, summary: SplitSummary, qrDataUrl: 
   doc.text('WHO OWES WHAT', CENTER, y, { align: 'center' })
   y += 6
 
-  summary.results.forEach((r, index) => {
+  displaySummary.results.forEach((r, index) => {
     doc.setFont('courier', 'bold')
     doc.setFontSize(9.5)
     doc.text(r.person.name, MARGIN, y)
@@ -151,23 +166,23 @@ function render(doc: jsPDF, state: BillState, summary: SplitSummary, qrDataUrl: 
     doc.setFontSize(8)
     y = drawWrapped(
       doc,
-      `  Items ${formatCurrency(r.itemCost)}   +Tax/tip ${formatCurrency(r.costWithTaxTip)}`,
+      `  Items ${formatCurrency(r.itemCost, displayCurrency)}   +Tax/tip ${formatCurrency(r.costWithTaxTip, displayCurrency)}`,
       MARGIN,
       y,
       CONTENT_WIDTH,
       8,
     )
     doc.setFont('courier', 'bold')
-    y = drawWrapped(doc, `  With cash back: ${formatCurrency(r.costWithCashBack)}`, MARGIN, y, CONTENT_WIDTH, 8)
+    y = drawWrapped(doc, `  With cash back: ${formatCurrency(r.costWithCashBack, displayCurrency)}`, MARGIN, y, CONTENT_WIDTH, 8)
     doc.setFont('courier', 'normal')
     y += 1
-    if (index !== summary.results.length - 1) {
+    if (index !== displaySummary.results.length - 1) {
       doc.setDrawColor(230)
       doc.line(MARGIN, y, RIGHT, y)
     }
     y += 3
   })
-  if (summary.results.length === 0) {
+  if (displaySummary.results.length === 0) {
     doc.setFont('courier', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(130)
@@ -194,6 +209,7 @@ function render(doc: jsPDF, state: BillState, summary: SplitSummary, qrDataUrl: 
 function renderCombineSummary(
   doc: jsPDF,
   receipts: CombineReceiptEntry[],
+  combinedCurrency: string,
   cashBackPercent: number,
   settleGroupBy: SettleGroupBy,
   qrDataUrl: string,
@@ -230,7 +246,7 @@ function renderCombineSummary(
     const startY = y
     const nameLines: string[] = doc.splitTextToSize(r.bill?.title || r.fileName, CONTENT_WIDTH - 18)
     doc.text(nameLines, MARGIN, y)
-    doc.text(formatCurrency(r.summary?.totalWithTaxTip ?? 0), RIGHT, startY, { align: 'right' })
+    doc.text(formatCurrency(r.summary?.totalWithTaxTip ?? 0, combinedCurrency), RIGHT, startY, { align: 'right' })
     y += nameLines.length * mmPerLine(8.5)
     doc.setFontSize(7)
     doc.setTextColor(130)
@@ -256,13 +272,13 @@ function renderCombineSummary(
   doc.setFontSize(9)
   for (const p of combined) {
     doc.text(p.name, MARGIN, y)
-    doc.text(formatCurrency(p.total), RIGHT, y, { align: 'right' })
+    doc.text(formatCurrency(p.total, combinedCurrency), RIGHT, y, { align: 'right' })
     y += mmPerLine(9)
   }
   y += 0.5
   doc.setFont('courier', 'bold')
   doc.text('GRAND TOTAL', MARGIN, y)
-  doc.text(formatCurrency(grandTotal), RIGHT, y, { align: 'right' })
+  doc.text(formatCurrency(grandTotal, combinedCurrency), RIGHT, y, { align: 'right' })
   y += mmPerLine(10)
   y += 1
   dashedRule()
@@ -280,15 +296,22 @@ function renderCombineSummary(
     doc.setFontSize(8)
     const netLabel =
       b.net > SETTLEMENT_EPSILON
-        ? `is owed ${formatCurrency(b.net)}`
+        ? `is owed ${formatCurrency(b.net, combinedCurrency)}`
         : b.net < -SETTLEMENT_EPSILON
-          ? `owes ${formatCurrency(-b.net)}`
+          ? `owes ${formatCurrency(-b.net, combinedCurrency)}`
           : 'settled up'
     doc.text(netLabel, RIGHT, y, { align: 'right' })
     y += mmPerLine(9.5)
     doc.setFontSize(7)
     doc.setTextColor(130)
-    y = drawWrapped(doc, `  paid ${formatCurrency(b.paid)} / owes ${formatCurrency(b.owed)}`, MARGIN, y, CONTENT_WIDTH, 7)
+    y = drawWrapped(
+      doc,
+      `  paid ${formatCurrency(b.paid, combinedCurrency)} / owes ${formatCurrency(b.owed, combinedCurrency)}`,
+      MARGIN,
+      y,
+      CONTENT_WIDTH,
+      7,
+    )
     doc.setTextColor(0)
     y += 1
   }
@@ -318,7 +341,7 @@ function renderCombineSummary(
       for (const s of items) {
         const line = settleGroupBy === 'payer' ? `  pays ${s.toName}` : `  ${s.fromName} pays`
         doc.text(line, MARGIN, y)
-        doc.text(formatCurrency(s.amount), RIGHT, y, { align: 'right' })
+        doc.text(formatCurrency(s.amount, combinedCurrency), RIGHT, y, { align: 'right' })
         y += mmPerLine(8)
       }
       y += 1
@@ -341,17 +364,19 @@ function renderCombineSummary(
 }
 
 export async function exportBillPDF(state: BillState, summary: SplitSummary): Promise<void> {
+  const { currency: displayCurrency, summary: displaySummary } = await resolveBillDisplay(state, summary)
+
   const qrPayload = encodeBillForQR(state)
   const qrDataUrl = await QRCode.toDataURL(qrPayload, { margin: 1, width: 240, errorCorrectionLevel: 'M' })
 
   // Pass 1: render onto a generously tall scratch document purely to measure how much
   // vertical space the content actually needs (item names can wrap to multiple lines).
   const scratch = new jsPDF({ unit: 'mm', format: [WIDTH, 2000] })
-  const measuredHeight = render(scratch, state, summary, qrDataUrl) + 8
+  const measuredHeight = render(scratch, state, summary, displayCurrency, displaySummary, qrDataUrl) + 8
 
   // Pass 2: render for real on a page sized to fit exactly, like a receipt.
   const doc = new jsPDF({ unit: 'mm', format: [WIDTH, Math.max(measuredHeight, 120)] })
-  render(doc, state, summary, qrDataUrl)
+  render(doc, state, summary, displayCurrency, displaySummary, qrDataUrl)
 
   doc.save(buildFilename(state))
 }
@@ -360,6 +385,7 @@ export async function exportCombinedPDF(
   receipts: CombineReceiptEntry[],
   cashBackPercent: number,
   settleGroupBy: SettleGroupBy,
+  currencyOverride: string | null,
 ): Promise<void> {
   const done = receipts.filter((r): r is CombineReceiptEntry & { bill: BillState; summary: SplitSummary } => r.status === 'done' && !!r.bill && !!r.summary)
   if (done.length === 0) {
@@ -370,11 +396,13 @@ export async function exportCombinedPDF(
   const payerIndices: (number | null)[] = []
 
   for (const r of done) {
+    const { currency: displayCurrency, summary: displaySummary } = await resolveBillDisplay(r.bill, r.summary)
+
     const qrPayload = encodeBillForQR(r.bill)
     const qrDataUrl = await QRCode.toDataURL(qrPayload, { margin: 1, width: 240, errorCorrectionLevel: 'M' })
 
     const scratch = new jsPDF({ unit: 'mm', format: [WIDTH, 2000] })
-    const measuredHeight = render(scratch, r.bill, r.summary, qrDataUrl) + 8
+    const measuredHeight = render(scratch, r.bill, r.summary, displayCurrency, displaySummary, qrDataUrl) + 8
     const pageFormat: [number, number] = [WIDTH, Math.max(measuredHeight, 120)]
 
     if (!doc) {
@@ -382,20 +410,29 @@ export async function exportCombinedPDF(
     } else {
       doc.addPage(pageFormat)
     }
-    render(doc, r.bill, r.summary, qrDataUrl)
+    render(doc, r.bill, r.summary, displayCurrency, displaySummary, qrDataUrl)
 
     const payerIndex = r.payerId ? r.bill.people.findIndex((p) => p.id === r.payerId) : -1
     payerIndices.push(payerIndex >= 0 ? payerIndex : null)
   }
 
-  const metaPayload = encodeCombineMetaForQR(payerIndices, cashBackPercent, settleGroupBy)
+  const combinedCurrency = determineCombinedCurrency(done, currencyOverride)
+  const needsRates = combineNeedsExchangeRates(done, combinedCurrency)
+  const usdRates = needsRates ? await fetchUsdRates().catch(() => null) : null
+  const scaledDone = scaleEntriesToCurrency(done, combinedCurrency, usdRates) as (CombineReceiptEntry & {
+    bill: BillState
+    summary: SplitSummary
+  })[]
+
+  const metaPayload = encodeCombineMetaForQR(payerIndices, cashBackPercent, settleGroupBy, currencyOverride)
   const metaQrDataUrl = await QRCode.toDataURL(metaPayload, { margin: 1, width: 240, errorCorrectionLevel: 'M' })
 
   const scratchSummary = new jsPDF({ unit: 'mm', format: [WIDTH, 2000] })
-  const measuredSummaryHeight = renderCombineSummary(scratchSummary, done, cashBackPercent, settleGroupBy, metaQrDataUrl) + 8
+  const measuredSummaryHeight =
+    renderCombineSummary(scratchSummary, scaledDone, combinedCurrency, cashBackPercent, settleGroupBy, metaQrDataUrl) + 8
 
   doc!.addPage([WIDTH, Math.max(measuredSummaryHeight, 120)])
-  renderCombineSummary(doc!, done, cashBackPercent, settleGroupBy, metaQrDataUrl)
+  renderCombineSummary(doc!, scaledDone, combinedCurrency, cashBackPercent, settleGroupBy, metaQrDataUrl)
 
   doc!.save(buildCombinedFilename())
 }

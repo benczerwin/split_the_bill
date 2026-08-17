@@ -11,14 +11,21 @@ export interface CompactCombineMeta {
   p: (number | null)[]
   cb: number // cash back percent
   gb: 0 | 1 // 0 = group settlements by payer, 1 = by payee
+  cc?: string | null // forced combined-currency override, null/absent means auto-infer
 }
 
-export function encodeCombineMetaForQR(payerIndices: (number | null)[], cashBackPercent: number, settleGroupBy: SettleGroupBy): string {
+export function encodeCombineMetaForQR(
+  payerIndices: (number | null)[],
+  cashBackPercent: number,
+  settleGroupBy: SettleGroupBy,
+  currencyOverride: string | null,
+): string {
   const meta: CompactCombineMeta = {
     v: 1,
     p: payerIndices,
     cb: cashBackPercent,
     gb: settleGroupBy === 'payee' ? 1 : 0,
+    cc: currencyOverride,
   }
   return COMBINE_QR_PREFIX + JSON.stringify(meta)
 }

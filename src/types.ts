@@ -28,6 +28,15 @@ export interface BillState {
   /** Person id who fronted the money for this bill, or null if unset. Carries over automatically
    *  when this bill is added into a Combine Receipts session. */
   payerId: string | null
+  /** ISO 4217 currency code the amounts above were entered in (what's printed on the receipt). */
+  currency: string
+  /** Currency your card/bank actually charged you in, if different from `currency`; null means
+   *  no conversion is needed. */
+  chargedCurrency: string | null
+  /** The actual total charged in `chargedCurrency`, straight from your bank statement. Each
+   *  person's share is scaled proportionally against this instead of the bill-currency total.
+   *  Null means it's not known — fall back to a live exchange rate. */
+  chargedTotal: number | null
 }
 
 export interface PersonResult {
@@ -69,6 +78,9 @@ export interface CombineState {
   receipts: CombineReceiptEntry[]
   cashBackPercent: number
   settleGroupBy: SettleGroupBy
+  /** Forces the combined totals/balances to display in this currency instead of the
+   *  auto-inferred one; null means auto-infer from the receipts. */
+  currencyOverride: string | null
 }
 
 /** A single-bill snapshot kept on-device so it can be added into a combine session without

@@ -3,19 +3,31 @@ import type { Item, Person } from '../types'
 import ItemRow from './ItemRow'
 import SwipeToDelete from './SwipeToDelete'
 import { formatCurrency } from '../lib/calculations'
+import { getCurrencySymbol } from '../lib/currency'
 import { CameraIcon } from './icons'
 
 interface ItemsListProps {
   items: Item[]
   people: Person[]
   subtotal: number
+  currency: string
   onAdd: () => void
   onChange: (id: string, patch: Partial<Item>) => void
   onDelete: (id: string) => void
   onScanReceipt: () => void
 }
 
-export default function ItemsList({ items, people, subtotal, onAdd, onChange, onDelete, onScanReceipt }: ItemsListProps) {
+export default function ItemsList({
+  items,
+  people,
+  subtotal,
+  currency,
+  onAdd,
+  onChange,
+  onDelete,
+  onScanReceipt,
+}: ItemsListProps) {
+  const currencySymbol = getCurrencySymbol(currency)
   const [openItemId, setOpenItemId] = useState<string | null>(null)
 
   return (
@@ -44,7 +56,13 @@ export default function ItemsList({ items, people, subtotal, onAdd, onChange, on
             isOpen={openItemId === item.id}
             onOpenChange={(open) => setOpenItemId(open ? item.id : null)}
           >
-            <ItemRow item={item} people={people} onChange={(patch) => onChange(item.id, patch)} onDelete={() => onDelete(item.id)} />
+            <ItemRow
+              item={item}
+              people={people}
+              currencySymbol={currencySymbol}
+              onChange={(patch) => onChange(item.id, patch)}
+              onDelete={() => onDelete(item.id)}
+            />
           </SwipeToDelete>
         ))}
         {items.length === 0 && (
@@ -63,7 +81,7 @@ export default function ItemsList({ items, people, subtotal, onAdd, onChange, on
           + Add item
         </button>
         <p className="text-sm text-slate-600">
-          Subtotal: <span className="font-semibold text-slate-900">{formatCurrency(subtotal)}</span>
+          Subtotal: <span className="font-semibold text-slate-900">{formatCurrency(subtotal, currency)}</span>
         </p>
       </div>
     </section>
