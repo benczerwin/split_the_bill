@@ -1,23 +1,11 @@
-import type { BillState, SplitSummary } from '../types'
+import type { CombineReceiptEntry } from '../types'
 import { formatCurrency } from '../lib/calculations'
 import { colorForIndex } from '../lib/palette'
 import PersonTag from './PersonTag'
 import { ChevronDownIcon } from './icons'
 
-export interface ReceiptEntry {
-  id: string
-  fileName: string
-  status: 'loading' | 'done' | 'error'
-  error?: string
-  bill?: BillState
-  summary?: SplitSummary
-  /** Person id (within this receipt's own people list) who fronted the money, or null if unset. */
-  payerId: string | null
-  expanded: boolean
-}
-
 interface ReceiptSectionProps {
-  entry: ReceiptEntry
+  entry: CombineReceiptEntry
   /** Maps a lowercased, trimmed person name to one shared colorIndex, so the same person
    *  looks the same everywhere in Combine Receipts even though each bill assigned its own
    *  colors independently when it was created. */

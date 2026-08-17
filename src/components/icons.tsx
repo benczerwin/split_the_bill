@@ -72,25 +72,6 @@ export function UploadIcon({ className }: { className?: string }) {
   )
 }
 
-export function LayersIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="m12 3 8.5 4.5L12 12 3.5 7.5 12 3Z" />
-      <path d="m3.5 12 8.5 4.5 8.5-4.5" />
-      <path d="m3.5 16.5 8.5 4.5 8.5-4.5" />
-    </svg>
-  )
-}
-
 export function MenuDotsIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
