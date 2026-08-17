@@ -96,6 +96,7 @@ export default function App() {
   // Set when building a fresh bill specifically to add into the combine session, so saving it
   // both records it and drops it straight into the combine list instead of just the library.
   const [addingForCombine, setAddingForCombine] = useState(false)
+  const [titleFocused, setTitleFocused] = useState(false)
 
   useEffect(() => saveMode(mode), [mode])
   useEffect(() => saveBillState(state), [state])
@@ -508,12 +509,15 @@ export default function App() {
                   type="text"
                   value={state.title}
                   onChange={(e) => setState((prev) => ({ ...prev, title: e.target.value }))}
+                  onFocus={() => setTitleFocused(true)}
+                  onBlur={() => setTitleFocused(false)}
                   placeholder="Untitled bill"
                   className="w-full rounded-xl border border-transparent bg-transparent py-1 pl-1 pr-7 text-xl font-semibold text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:py-2 focus:pl-3 focus:outline-none focus:ring-1 focus:ring-slate-300"
                 />
-                {state.title && (
+                {titleFocused && state.title && (
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setState((prev) => ({ ...prev, title: '' }))}
                     aria-label="Clear title"
                     className="absolute inset-y-0 right-1 flex items-center px-1 text-slate-300 hover:text-slate-500"

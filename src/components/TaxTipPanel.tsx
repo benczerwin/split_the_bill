@@ -52,13 +52,13 @@ export default function TaxTipPanel({
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">Tax</span>
             <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              Add tax
               <input
                 type="checkbox"
                 checked={taxEnabled}
                 onChange={(e) => onTaxChange(e.target.checked ? lastTaxValue.current : 0)}
                 className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
               />
-              Add tax
             </label>
           </div>
           <div
@@ -84,13 +84,13 @@ export default function TaxTipPanel({
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">Tip</span>
             <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              Add tip
               <input
                 type="checkbox"
                 checked={tipEnabled}
                 onChange={(e) => onTipValueChange(e.target.checked ? lastTipValue.current : 0)}
                 className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
               />
-              Add tip
             </label>
           </div>
           <div
@@ -124,13 +124,13 @@ export default function TaxTipPanel({
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">Cash back</span>
             <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              Add cash back
               <input
                 type="checkbox"
                 checked={cashBackEnabled}
                 onChange={(e) => onCashBackChange(e.target.checked ? lastCashBackValue.current : 0)}
                 className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
               />
-              Add cash back
             </label>
           </div>
           <div
