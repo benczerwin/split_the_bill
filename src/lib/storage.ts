@@ -7,7 +7,7 @@ const MODE_KEY = 'split-the-bill:mode:v1'
 const COMBINE_KEY = 'split-the-bill:combine-state:v1'
 const LIBRARY_KEY = 'split-the-bill:receipt-library:v1'
 
-const LIBRARY_LIMIT = 30
+export const LIBRARY_LIMIT = 30
 
 export function loadBillState(): BillState | null {
   try {
