@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AppMode } from '../types'
-import { DownloadIcon, GearIcon, MenuDotsIcon, TrashIcon, UploadIcon } from './icons'
+import { DownloadIcon, GearIcon, MenuDotsIcon, SparkleIcon, UploadIcon } from './icons'
 
 interface HeaderMenuProps {
   mode: AppMode
@@ -8,7 +8,7 @@ interface HeaderMenuProps {
   isExporting: boolean
   onImportFile: (file: File) => void
   onExport: () => void
-  onClearAll: () => void
+  onLoadExample: () => void
   onSettings: () => void
 }
 
@@ -22,7 +22,7 @@ export default function HeaderMenu({
   isExporting,
   onImportFile,
   onExport,
-  onClearAll,
+  onLoadExample,
   onSettings,
 }: HeaderMenuProps) {
   const [open, setOpen] = useState(false)
@@ -51,7 +51,6 @@ export default function HeaderMenu({
   }
 
   const importSubtitle = mode === 'single' ? 'Replaces the current bill' : 'Replaces the current combine session'
-  const clearLabel = mode === 'single' ? 'Clear all' : 'Clear combine session'
 
   return (
     <div ref={containerRef} className="relative">
@@ -99,6 +98,19 @@ export default function HeaderMenu({
             {isExporting ? <Spinner /> : <DownloadIcon className="h-4 w-4 text-slate-400" />}
             Export as PDF
           </button>
+          {mode === 'single' && (
+            <button
+              type="button"
+              onClick={() => runAndClose(onLoadExample)}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-100"
+            >
+              <SparkleIcon className="h-4 w-4 text-slate-400" />
+              <span>
+                Load example
+                <span className="block text-xs text-slate-400">See how a filled-in bill looks</span>
+              </span>
+            </button>
+          )}
           <div className="my-1 border-t border-slate-100" />
           <button
             type="button"
@@ -107,14 +119,6 @@ export default function HeaderMenu({
           >
             <GearIcon className="h-4 w-4 text-slate-400" />
             Settings
-          </button>
-          <button
-            type="button"
-            onClick={() => runAndClose(onClearAll)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
-          >
-            <TrashIcon className="h-4 w-4 text-red-400" />
-            {clearLabel}
           </button>
         </div>
       )}

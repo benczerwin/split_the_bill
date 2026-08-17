@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import type { CombineState, SavedReceipt, SettleGroupBy } from '../types'
 import { formatCurrency } from '../lib/calculations'
 import {
@@ -11,17 +11,20 @@ import {
 } from '../lib/combineCalculations'
 import PersonTag from './PersonTag'
 import ReceiptSection from './ReceiptSection'
+import { PencilIcon } from './icons'
 
 interface CombinePageProps {
   combineState: CombineState
   library: SavedReceipt[]
   onAddFiles: (files: FileList | null) => void
+  onStartNewBillForCombine: () => void
   onRemoveReceipt: (id: string) => void
   onToggleExpanded: (id: string) => void
   onSetPayer: (id: string, payerId: string | null) => void
   onCashBackPercentChange: (value: number) => void
   onSettleGroupByChange: (value: SettleGroupBy) => void
   onAddFromLibrary: (ids: string[]) => void
+  onEditLibraryItem: (id: string) => void
   onRemoveLibraryItem: (id: string) => void
   onClearLibrary: () => void
 }
@@ -30,16 +33,17 @@ export default function CombinePage({
   combineState,
   library,
   onAddFiles,
+  onStartNewBillForCombine,
   onRemoveReceipt,
   onToggleExpanded,
   onSetPayer,
   onCashBackPercentChange,
   onSettleGroupByChange,
   onAddFromLibrary,
+  onEditLibraryItem,
   onRemoveLibraryItem,
   onClearLibrary,
 }: CombinePageProps) {
-  const [selectedLibraryIds, setSelectedLibraryIds] = useState<Set<string>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { receipts, cashBackPercent, settleGroupBy } = combineState
@@ -54,29 +58,15 @@ export default function CombinePage({
   const groupedSettlements = groupSettlements(settlements, settleGroupBy)
   const missingPayerCount = doneEntries.filter((e) => !e.payerId).length
 
-  function toggleLibrarySelection(id: string) {
-    setSelectedLibraryIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  // If this library item is already in the combine list, the checkbox doubles as a shortcut to
-  // remove it from there — no need to scroll down to that receipt's own remove button.
+  // Checking a box adds that bill immediately; if it's already in the combine list, the same
+  // checkbox doubles as a remove shortcut — no staging step, no separate "add selected" button.
   function toggleLibraryItem(libraryId: string) {
     const addedEntry = receipts.find((r) => r.libraryId === libraryId)
     if (addedEntry) {
       onRemoveReceipt(addedEntry.id)
-      return
+    } else {
+      onAddFromLibrary([libraryId])
     }
-    toggleLibrarySelection(libraryId)
-  }
-
-  function handleAddSelected() {
-    onAddFromLibrary(Array.from(selectedLibraryIds))
-    setSelectedLibraryIds(new Set())
   }
 
   return (
@@ -100,30 +90,36 @@ export default function CombinePage({
         </div>
         {library.length === 0 ? (
           <p className="mt-2 text-xs text-slate-400">
-            Bills you clear from Single Bill mode are saved here automatically, so you can add them into a
+            Bills you clear or save from Single Bill mode appear here automatically, so you can add them into a
             combine session without exporting and re-uploading a PDF.
           </p>
         ) : (
           <>
+            <p className="mt-1 text-xs text-slate-400">Check a bill to add it below; uncheck to remove it.</p>
             <div className="mt-3 max-h-56 space-y-1 overflow-y-auto">
               {library.map((item) => {
                 const alreadyAdded = addedLibraryIds.has(item.id)
-                const checked = alreadyAdded || selectedLibraryIds.has(item.id)
                 return (
                   <div key={item.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
-                    <label className="flex min-w-0 flex-1 items-center gap-2" title={alreadyAdded ? 'Uncheck to remove it from the list below' : undefined}>
+                    <label className="flex min-w-0 flex-1 items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={checked}
+                        checked={alreadyAdded}
                         onChange={() => toggleLibraryItem(item.id)}
                         className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
                       />
                       <span className="min-w-0 flex-1 truncate text-slate-700">{item.bill.title || 'Untitled bill'}</span>
-                      {alreadyAdded && (
-                        <span className="shrink-0 text-xs font-medium text-emerald-600">Added</span>
-                      )}
+                      {alreadyAdded && <span className="shrink-0 text-xs font-medium text-emerald-600">Added</span>}
                       <span className="shrink-0 text-xs text-slate-400">{item.bill.date}</span>
                     </label>
+                    <button
+                      type="button"
+                      onClick={() => onEditLibraryItem(item.id)}
+                      aria-label={`Edit ${item.bill.title || 'saved bill'}`}
+                      className="shrink-0 rounded-full p-1 text-slate-300 hover:text-slate-600"
+                    >
+                      <PencilIcon className="h-3.5 w-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => onRemoveLibraryItem(item.id)}
@@ -136,14 +132,6 @@ export default function CombinePage({
                 )
               })}
             </div>
-            <button
-              type="button"
-              disabled={selectedLibraryIds.size === 0}
-              onClick={handleAddSelected}
-              className="mt-3 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white disabled:opacity-40"
-            >
-              Add{selectedLibraryIds.size > 0 ? ` ${selectedLibraryIds.size}` : ''} selected
-            </button>
           </>
         )}
       </section>
@@ -160,13 +148,22 @@ export default function CombinePage({
             e.target.value = ''
           }}
         />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full rounded-xl border-2 border-dashed border-slate-300 py-6 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700"
-        >
-          + Add receipt PDFs
-        </button>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded-xl border-2 border-dashed border-slate-300 py-6 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700"
+          >
+            + Add receipt PDFs
+          </button>
+          <button
+            type="button"
+            onClick={onStartNewBillForCombine}
+            className="rounded-xl border-2 border-dashed border-slate-300 py-6 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700"
+          >
+            + Build a new bill
+          </button>
+        </div>
 
         {receipts.length > 0 && (
           <div className="mt-4 space-y-2">
@@ -185,7 +182,8 @@ export default function CombinePage({
 
         {receipts.length === 0 && (
           <p className="mt-4 text-center text-sm text-slate-400">
-            No receipts yet — add some from your library above or upload a few PDFs exported from Split the Bill.
+            No receipts yet — add some from your library above, upload a few exported PDFs, or build one from
+            scratch.
           </p>
         )}
       </section>

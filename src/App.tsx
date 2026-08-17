@@ -24,6 +24,7 @@ import SettingsModal from './components/SettingsModal'
 import ReceiptScanModal from './components/ReceiptScanModal'
 import CombinePage from './components/CombinePage'
 import HeaderMenu from './components/HeaderMenu'
+import { TrashIcon } from './components/icons'
 import { APP_VERSION } from './version'
 
 function uid(): string {
@@ -48,6 +49,33 @@ function makeDefaultCombineState(): CombineState {
   return { receipts: [], cashBackPercent: 0, settleGroupBy: 'payer' }
 }
 
+function makeExampleState(): BillState {
+  const alex = uid()
+  const sam = uid()
+  const jordan = uid()
+  return {
+    title: 'Taco Tuesday',
+    date: nowAsDateOnly(),
+    people: [
+      { id: alex, name: 'Alex', colorIndex: 0 },
+      { id: sam, name: 'Sam', colorIndex: 1 },
+      { id: jordan, name: 'Jordan', colorIndex: 2 },
+    ],
+    items: [
+      { id: uid(), name: 'Chips & Guac', price: 8.5, assignedTo: [] },
+      { id: uid(), name: 'Fish Tacos (3)', price: 16.5, assignedTo: [alex] },
+      { id: uid(), name: 'Carne Asada Burrito', price: 13, assignedTo: [sam] },
+      { id: uid(), name: 'Veggie Bowl', price: 12, assignedTo: [jordan] },
+      { id: uid(), name: 'Margaritas (2)', price: 19, assignedTo: [alex, sam] },
+    ],
+    tax: 5.6,
+    tipMode: 'percent',
+    tipValue: 20,
+    cashBackPercent: 4,
+    paid: {},
+  }
+}
+
 export default function App() {
   const [mode, setMode] = useState<AppMode>(() => loadMode())
   const [state, setState] = useState<BillState>(() => {
@@ -62,6 +90,12 @@ export default function App() {
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [importNotice, setImportNotice] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
+  // Set when editing a saved bill from the library (via Combine Receipts), so "Save to
+  // library" updates that entry in place instead of creating a new one.
+  const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null)
+  // Set when building a fresh bill specifically to add into the combine session, so saving it
+  // both records it and drops it straight into the combine list instead of just the library.
+  const [addingForCombine, setAddingForCombine] = useState(false)
 
   useEffect(() => saveMode(mode), [mode])
   useEffect(() => saveBillState(state), [state])
@@ -127,15 +161,82 @@ export default function App() {
   function switchMode(next: AppMode) {
     setMode(next)
     setImportNotice(null)
+    setEditingLibraryId(null)
+    setAddingForCombine(false)
   }
 
   function handleSaveToLibrary() {
     if (state.people.length === 0 && state.items.length === 0) return
+
+    if (editingLibraryId) {
+      setLibrary((prev) => prev.map((item) => (item.id === editingLibraryId ? { ...item, bill: state } : item)))
+      setImportNotice({ kind: 'success', message: 'Updated the saved bill in your library.' })
+      return
+    }
+
+    const nextLibrary = addToReceiptLibrary(library, state)
+    setLibrary(nextLibrary)
+
+    if (addingForCombine) {
+      const savedItem = nextLibrary[0]
+      const newEntry: CombineReceiptEntry = {
+        id: uid(),
+        fileName: state.title || 'Untitled bill',
+        status: 'done',
+        bill: state,
+        summary: computeSplit(state),
+        payerId: null,
+        expanded: true,
+        libraryId: savedItem.id,
+      }
+      setCombineState((prev) => ({ ...prev, receipts: [...prev.receipts, newEntry] }))
+      setAddingForCombine(false)
+      switchMode('combine')
+      setImportNotice({ kind: 'success', message: 'Added to your combine session.' })
+    } else {
+      setImportNotice({
+        kind: 'success',
+        message: `Saved on this device. Find it under Combine Receipts → From your device (kept until you delete it or the ${LIBRARY_LIMIT} most recent bills fill up).`,
+      })
+    }
+  }
+
+  function handleSaveAsNewFromEdit() {
+    if (state.people.length === 0 && state.items.length === 0) return
     setLibrary((prev) => addToReceiptLibrary(prev, state))
-    setImportNotice({
-      kind: 'success',
-      message: `Saved on this device. Find it under Combine Receipts → From your device (kept until you delete it or the ${LIBRARY_LIMIT} most recent bills fill up).`,
-    })
+    setEditingLibraryId(null)
+    setImportNotice({ kind: 'success', message: 'Saved as a new bill in your library.' })
+  }
+
+  function handleEditLibraryItem(id: string) {
+    const item = library.find((l) => l.id === id)
+    if (!item) return
+    if (state.people.length > 0 || state.items.length > 0) {
+      const confirmed = window.confirm('Editing this saved bill replaces your current single-bill draft. Continue?')
+      if (!confirmed) return
+    }
+    switchMode('single')
+    setState({ ...item.bill, date: toDateOnly(item.bill.date) })
+    setEditingLibraryId(id)
+  }
+
+  function handleStartNewBillForCombine() {
+    if (state.people.length > 0 || state.items.length > 0) {
+      const confirmed = window.confirm('Start a new bill for this combine session? This replaces your current single-bill draft.')
+      if (!confirmed) return
+    }
+    switchMode('single')
+    setState(makeDefaultState())
+    setAddingForCombine(true)
+  }
+
+  function handleLoadExample() {
+    if (state.people.length > 0 || state.items.length > 0) {
+      const confirmed = window.confirm('Load the example bill? This replaces your current bill.')
+      if (!confirmed) return
+    }
+    setState(makeExampleState())
+    setImportNotice(null)
   }
 
   function handleClearAll() {
@@ -146,6 +247,8 @@ export default function App() {
         setLibrary((prev) => addToReceiptLibrary(prev, state))
       }
       setState(makeDefaultState())
+      setEditingLibraryId(null)
+      setAddingForCombine(false)
     } else {
       if (combineState.receipts.length > 0 && !window.confirm('Clear all receipts from this combine session?')) return
       setCombineState(makeDefaultCombineState())
@@ -322,14 +425,14 @@ export default function App() {
             isExporting={isExporting}
             onImportFile={handleImportFile}
             onExport={handleExport}
-            onClearAll={handleClearAll}
+            onLoadExample={handleLoadExample}
             onSettings={() => setShowSettings(true)}
           />
         </div>
       </header>
 
-      <div className="mx-auto mt-4 max-w-3xl px-4">
-        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
+      <div className="mx-auto mt-4 flex max-w-3xl items-stretch gap-2 px-4">
+        <div className="grid flex-1 grid-cols-2 gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
           <button
             type="button"
             onClick={() => switchMode('single')}
@@ -349,6 +452,15 @@ export default function App() {
             Combine receipts
           </button>
         </div>
+        <button
+          type="button"
+          onClick={handleClearAll}
+          aria-label={mode === 'single' ? 'Clear bill' : 'Clear combine session'}
+          title={mode === 'single' ? 'Clear bill' : 'Clear combine session'}
+          className="shrink-0 rounded-2xl bg-white px-3 text-slate-400 shadow-sm ring-1 ring-slate-200 hover:text-red-500"
+        >
+          <TrashIcon className="h-5 w-5" />
+        </button>
       </div>
 
       {importNotice && (
@@ -371,14 +483,45 @@ export default function App() {
       <main className="mx-auto mt-6 flex max-w-3xl flex-col gap-6 px-4">
         {mode === 'single' ? (
           <>
+            {(addingForCombine || editingLibraryId) && (
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-50 px-4 py-2.5 text-sm text-indigo-700">
+                <span>
+                  {addingForCombine
+                    ? 'Building a new bill for your combine session — saving it below will add it there automatically.'
+                    : 'Editing a saved bill — saving it below updates that entry instead of creating a new one.'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingForCombine(false)
+                    setEditingLibraryId(null)
+                  }}
+                  className="shrink-0 font-medium underline hover:no-underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="text"
-                value={state.title}
-                onChange={(e) => setState((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="Untitled bill"
-                className="min-w-[10rem] flex-1 rounded-xl border border-transparent bg-transparent px-1 py-1 text-xl font-semibold text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:px-3 focus:py-2 focus:outline-none focus:ring-1 focus:ring-slate-300"
-              />
+              <div className="relative min-w-[10rem] flex-1">
+                <input
+                  type="text"
+                  value={state.title}
+                  onChange={(e) => setState((prev) => ({ ...prev, title: e.target.value }))}
+                  placeholder="Untitled bill"
+                  className="w-full rounded-xl border border-transparent bg-transparent py-1 pl-1 pr-7 text-xl font-semibold text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:py-2 focus:pl-3 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                />
+                {state.title && (
+                  <button
+                    type="button"
+                    onClick={() => setState((prev) => ({ ...prev, title: '' }))}
+                    aria-label="Clear title"
+                    className="absolute inset-y-0 right-1 flex items-center px-1 text-slate-300 hover:text-slate-500"
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
               <input
                 type="date"
                 value={state.date}
@@ -414,13 +557,23 @@ export default function App() {
                 disabled={state.people.length === 0 && state.items.length === 0}
                 className="w-full rounded-xl border border-slate-300 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
               >
-                Save to library
+                {editingLibraryId ? 'Update saved bill' : addingForCombine ? 'Add to combine session' : 'Save to library'}
               </button>
-              <p className="mt-2 text-xs text-slate-400">
-                Saved only in this browser on this device — not synced anywhere. Kept until you delete it or the{' '}
-                {LIBRARY_LIMIT} most recent bills fill up, whichever comes first. Add it into a Combine Receipts
-                session anytime from &ldquo;From your device.&rdquo;
-              </p>
+              {editingLibraryId ? (
+                <button
+                  type="button"
+                  onClick={handleSaveAsNewFromEdit}
+                  className="mt-2 text-xs text-slate-400 underline hover:text-slate-600"
+                >
+                  Save as a new bill instead
+                </button>
+              ) : (
+                <p className="mt-2 text-xs text-slate-400">
+                  Saved only in this browser on this device — not synced anywhere. Kept until you delete it or the{' '}
+                  {LIBRARY_LIMIT} most recent bills fill up, whichever comes first. Add it into a Combine Receipts
+                  session anytime from &ldquo;From your device.&rdquo;
+                </p>
+              )}
             </section>
           </>
         ) : (
@@ -428,12 +581,14 @@ export default function App() {
             combineState={combineState}
             library={library}
             onAddFiles={handleAddReceiptFiles}
+            onStartNewBillForCombine={handleStartNewBillForCombine}
             onRemoveReceipt={handleRemoveReceipt}
             onToggleExpanded={handleToggleReceiptExpanded}
             onSetPayer={handleSetReceiptPayer}
             onCashBackPercentChange={handleCashBackPercentChange}
             onSettleGroupByChange={handleSettleGroupByChange}
             onAddFromLibrary={handleAddFromLibrary}
+            onEditLibraryItem={handleEditLibraryItem}
             onRemoveLibraryItem={handleRemoveLibraryItem}
             onClearLibrary={handleClearLibrary}
           />
