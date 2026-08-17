@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useBodyScrollLock } from '../lib/useBodyScrollLock'
 
 interface SettingsModalProps {
   apiKey: string
@@ -8,6 +9,7 @@ interface SettingsModalProps {
 
 export default function SettingsModal({ apiKey, onSave, onClose }: SettingsModalProps) {
   const [value, setValue] = useState(apiKey)
+  useBodyScrollLock()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

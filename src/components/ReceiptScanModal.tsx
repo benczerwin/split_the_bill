@@ -4,6 +4,7 @@ import { fileToBase64, scanReceipt, type ScannedReceipt } from '../lib/receiptSc
 import { PASTE_PROMPT, parsePastedReceiptText } from '../lib/pasteParse'
 import { formatCurrency } from '../lib/calculations'
 import { formatDateOnly } from '../lib/dateUtils'
+import { useBodyScrollLock } from '../lib/useBodyScrollLock'
 import { CameraIcon } from './icons'
 
 interface ReceiptScanModalProps {
@@ -43,6 +44,7 @@ function normalizePastedText(raw: string): string {
 }
 
 export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onApply }: ReceiptScanModalProps) {
+  useBodyScrollLock()
   const [engine, setEngine] = useState<Engine>(apiKey ? 'claude' : 'paste')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
