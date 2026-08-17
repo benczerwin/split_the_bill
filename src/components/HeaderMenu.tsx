@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { DownloadIcon, GearIcon, LayersIcon, MenuDotsIcon, TrashIcon, UploadIcon } from './icons'
+import type { AppMode } from '../types'
+import { DownloadIcon, GearIcon, MenuDotsIcon, TrashIcon, UploadIcon } from './icons'
 
 interface HeaderMenuProps {
+  mode: AppMode
   isImporting: boolean
   isExporting: boolean
   onImportFile: (file: File) => void
   onExport: () => void
-  onCombine: () => void
   onClearAll: () => void
   onSettings: () => void
 }
@@ -16,11 +17,11 @@ function Spinner() {
 }
 
 export default function HeaderMenu({
+  mode,
   isImporting,
   isExporting,
   onImportFile,
   onExport,
-  onCombine,
   onClearAll,
   onSettings,
 }: HeaderMenuProps) {
@@ -48,6 +49,9 @@ export default function HeaderMenu({
     setOpen(false)
     action()
   }
+
+  const importSubtitle = mode === 'single' ? 'Replaces the current bill' : 'Replaces the current combine session'
+  const clearLabel = mode === 'single' ? 'Clear all' : 'Clear combine session'
 
   return (
     <div ref={containerRef} className="relative">
@@ -83,7 +87,7 @@ export default function HeaderMenu({
             {isImporting ? <Spinner /> : <UploadIcon className="h-4 w-4 text-slate-400" />}
             <span>
               Import from PDF
-              <span className="block text-xs text-slate-400">Replaces the current bill</span>
+              <span className="block text-xs text-slate-400">{importSubtitle}</span>
             </span>
           </button>
           <button
@@ -94,14 +98,6 @@ export default function HeaderMenu({
           >
             {isExporting ? <Spinner /> : <DownloadIcon className="h-4 w-4 text-slate-400" />}
             Export as PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => runAndClose(onCombine)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-100"
-          >
-            <LayersIcon className="h-4 w-4 text-slate-400" />
-            Combine receipts
           </button>
           <div className="my-1 border-t border-slate-100" />
           <button
@@ -118,7 +114,7 @@ export default function HeaderMenu({
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
           >
             <TrashIcon className="h-4 w-4 text-red-400" />
-            Clear all
+            {clearLabel}
           </button>
         </div>
       )}

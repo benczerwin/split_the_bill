@@ -1,9 +1,18 @@
 import { jsPDF } from 'jspdf'
 import QRCode from 'qrcode'
-import type { BillState, SplitSummary } from '../types'
+import type { BillState, CombineReceiptEntry, SettleGroupBy, SplitSummary } from '../types'
 import { formatCurrency } from './calculations'
 import { encodeBillForQR } from './billCodec'
+import { encodeCombineMetaForQR } from './combineCodec'
 import { formatDateOnly } from './dateUtils'
+import {
+  buildBalances,
+  buildCombined,
+  buildNameColorMap,
+  groupSettlements,
+  simplifySettlements,
+  SETTLEMENT_EPSILON,
+} from './combineCalculations'
 
 const WIDTH = 80 // mm — classic receipt width
 const MARGIN = 6
@@ -18,6 +27,11 @@ function buildFilename(state: BillState): string {
   // Strip characters that are invalid in filenames on Windows/macOS/Linux; keep everything else
   // (spaces, punctuation) so the name stays human-readable rather than turning into a slug.
   return `${name.replace(/[\\/:*?"<>|]/g, '-').trim()}.pdf`
+}
+
+function buildCombinedFilename(): string {
+  const datePart = new Date().toISOString().slice(0, 10)
+  return `${datePart} Combined Receipts.pdf`
 }
 
 function mmPerLine(fontSize: number): number {
@@ -177,6 +191,155 @@ function render(doc: jsPDF, state: BillState, summary: SplitSummary, qrDataUrl: 
   return y
 }
 
+function renderCombineSummary(
+  doc: jsPDF,
+  receipts: CombineReceiptEntry[],
+  cashBackPercent: number,
+  settleGroupBy: SettleGroupBy,
+  qrDataUrl: string,
+): number {
+  let y = 10
+
+  const dashedRule = () => {
+    doc.setLineDashPattern([1, 1], 0)
+    doc.setDrawColor(160)
+    doc.line(MARGIN, y, RIGHT, y)
+    doc.setLineDashPattern([], 0)
+  }
+
+  doc.setTextColor(0)
+  doc.setFont('courier', 'bold')
+  doc.setFontSize(14)
+  doc.text('COMBINED RECEIPTS', CENTER, y, { align: 'center' })
+  y += 5
+  doc.setFont('courier', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(120)
+  doc.text(`${receipts.length} receipt${receipts.length === 1 ? '' : 's'}`, CENTER, y, { align: 'center' })
+  doc.setTextColor(0)
+  y += 5
+  dashedRule()
+  y += 5
+
+  doc.setFont('courier', 'bold')
+  doc.setFontSize(9)
+  for (const r of receipts) {
+    const payerName = r.bill?.people.find((p) => p.id === r.payerId)?.name
+    doc.setFont('courier', 'normal')
+    doc.setFontSize(8.5)
+    const startY = y
+    const nameLines: string[] = doc.splitTextToSize(r.bill?.title || r.fileName, CONTENT_WIDTH - 18)
+    doc.text(nameLines, MARGIN, y)
+    doc.text(formatCurrency(r.summary?.totalWithTaxTip ?? 0), RIGHT, startY, { align: 'right' })
+    y += nameLines.length * mmPerLine(8.5)
+    doc.setFontSize(7)
+    doc.setTextColor(130)
+    y = drawWrapped(doc, `  paid by: ${payerName ?? 'unset'}`, MARGIN, y, CONTENT_WIDTH, 7)
+    doc.setTextColor(0)
+  }
+  y += 1
+  dashedRule()
+  y += 5
+
+  const nameColorMap = buildNameColorMap(receipts)
+  const combined = buildCombined(receipts, nameColorMap, cashBackPercent)
+  const grandTotal = combined.reduce((sum, p) => sum + p.total, 0)
+  const balances = buildBalances(receipts, combined, nameColorMap)
+  const settlements = simplifySettlements(balances)
+  const grouped = groupSettlements(settlements, settleGroupBy)
+
+  doc.setFont('courier', 'bold')
+  doc.setFontSize(10)
+  doc.text('COMBINED TOTALS', CENTER, y, { align: 'center' })
+  y += 6
+  doc.setFont('courier', 'normal')
+  doc.setFontSize(9)
+  for (const p of combined) {
+    doc.text(p.name, MARGIN, y)
+    doc.text(formatCurrency(p.total), RIGHT, y, { align: 'right' })
+    y += mmPerLine(9)
+  }
+  y += 0.5
+  doc.setFont('courier', 'bold')
+  doc.text('GRAND TOTAL', MARGIN, y)
+  doc.text(formatCurrency(grandTotal), RIGHT, y, { align: 'right' })
+  y += mmPerLine(10)
+  y += 1
+  dashedRule()
+  y += 6
+
+  doc.setFont('courier', 'bold')
+  doc.setFontSize(10)
+  doc.text('BALANCES', CENTER, y, { align: 'center' })
+  y += 6
+  for (const b of balances) {
+    doc.setFont('courier', 'bold')
+    doc.setFontSize(9.5)
+    doc.text(b.name, MARGIN, y)
+    doc.setFont('courier', 'normal')
+    doc.setFontSize(8)
+    const netLabel =
+      b.net > SETTLEMENT_EPSILON
+        ? `is owed ${formatCurrency(b.net)}`
+        : b.net < -SETTLEMENT_EPSILON
+          ? `owes ${formatCurrency(-b.net)}`
+          : 'settled up'
+    doc.text(netLabel, RIGHT, y, { align: 'right' })
+    y += mmPerLine(9.5)
+    doc.setFontSize(7)
+    doc.setTextColor(130)
+    y = drawWrapped(doc, `  paid ${formatCurrency(b.paid)} / owes ${formatCurrency(b.owed)}`, MARGIN, y, CONTENT_WIDTH, 7)
+    doc.setTextColor(0)
+    y += 1
+  }
+  y += 1
+  dashedRule()
+  y += 6
+
+  doc.setFont('courier', 'bold')
+  doc.setFontSize(10)
+  doc.text('SETTLEMENTS', CENTER, y, { align: 'center' })
+  y += 6
+  if (grouped.length === 0) {
+    doc.setFont('courier', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(130)
+    doc.text('Everyone is settled up.', MARGIN, y)
+    doc.setTextColor(0)
+    y += 4
+  } else {
+    for (const [name, items] of grouped) {
+      doc.setFont('courier', 'bold')
+      doc.setFontSize(8.5)
+      doc.text(name, MARGIN, y)
+      y += mmPerLine(8.5)
+      doc.setFont('courier', 'normal')
+      doc.setFontSize(8)
+      for (const s of items) {
+        const line = settleGroupBy === 'payer' ? `  pays ${s.toName}` : `  ${s.fromName} pays`
+        doc.text(line, MARGIN, y)
+        doc.text(formatCurrency(s.amount), RIGHT, y, { align: 'right' })
+        y += mmPerLine(8)
+      }
+      y += 1
+    }
+  }
+
+  dashedRule()
+  y += 7
+
+  const qrSize = 30
+  doc.addImage(qrDataUrl, 'PNG', CENTER - qrSize / 2, y, qrSize, qrSize)
+  y += qrSize + 4
+  doc.setFont('courier', 'normal')
+  doc.setFontSize(6.5)
+  doc.setTextColor(120)
+  y = drawWrapped(doc, 'Re-upload this PDF in Split the Bill to restore this combine session', CENTER, y, CONTENT_WIDTH, 6.5, 'center')
+  doc.setTextColor(0)
+
+  return y
+}
+
 export async function exportBillPDF(state: BillState, summary: SplitSummary): Promise<void> {
   const qrPayload = encodeBillForQR(state)
   const qrDataUrl = await QRCode.toDataURL(qrPayload, { margin: 1, width: 240, errorCorrectionLevel: 'M' })
@@ -191,4 +354,48 @@ export async function exportBillPDF(state: BillState, summary: SplitSummary): Pr
   render(doc, state, summary, qrDataUrl)
 
   doc.save(buildFilename(state))
+}
+
+export async function exportCombinedPDF(
+  receipts: CombineReceiptEntry[],
+  cashBackPercent: number,
+  settleGroupBy: SettleGroupBy,
+): Promise<void> {
+  const done = receipts.filter((r): r is CombineReceiptEntry & { bill: BillState; summary: SplitSummary } => r.status === 'done' && !!r.bill && !!r.summary)
+  if (done.length === 0) {
+    throw new Error('Add at least one receipt before exporting.')
+  }
+
+  let doc: jsPDF | null = null
+  const payerIndices: (number | null)[] = []
+
+  for (const r of done) {
+    const qrPayload = encodeBillForQR(r.bill)
+    const qrDataUrl = await QRCode.toDataURL(qrPayload, { margin: 1, width: 240, errorCorrectionLevel: 'M' })
+
+    const scratch = new jsPDF({ unit: 'mm', format: [WIDTH, 2000] })
+    const measuredHeight = render(scratch, r.bill, r.summary, qrDataUrl) + 8
+    const pageFormat: [number, number] = [WIDTH, Math.max(measuredHeight, 120)]
+
+    if (!doc) {
+      doc = new jsPDF({ unit: 'mm', format: pageFormat })
+    } else {
+      doc.addPage(pageFormat)
+    }
+    render(doc, r.bill, r.summary, qrDataUrl)
+
+    const payerIndex = r.payerId ? r.bill.people.findIndex((p) => p.id === r.payerId) : -1
+    payerIndices.push(payerIndex >= 0 ? payerIndex : null)
+  }
+
+  const metaPayload = encodeCombineMetaForQR(payerIndices, cashBackPercent, settleGroupBy)
+  const metaQrDataUrl = await QRCode.toDataURL(metaPayload, { margin: 1, width: 240, errorCorrectionLevel: 'M' })
+
+  const scratchSummary = new jsPDF({ unit: 'mm', format: [WIDTH, 2000] })
+  const measuredSummaryHeight = renderCombineSummary(scratchSummary, done, cashBackPercent, settleGroupBy, metaQrDataUrl) + 8
+
+  doc!.addPage([WIDTH, Math.max(measuredSummaryHeight, 120)])
+  renderCombineSummary(doc!, done, cashBackPercent, settleGroupBy, metaQrDataUrl)
+
+  doc!.save(buildCombinedFilename())
 }

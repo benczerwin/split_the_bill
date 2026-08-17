@@ -43,3 +43,35 @@ export interface SplitSummary {
   unassignedItems: Item[]
   isBalanced: boolean
 }
+
+export type AppMode = 'single' | 'combine'
+
+export interface CombineReceiptEntry {
+  id: string
+  fileName: string
+  status: 'loading' | 'done' | 'error'
+  error?: string
+  bill?: BillState
+  summary?: SplitSummary
+  /** Person id (within this receipt's own people list) who fronted the money, or null if unset. */
+  payerId: string | null
+  expanded: boolean
+  /** Id of the SavedReceipt this came from, if added via the local library rather than a file upload. */
+  libraryId?: string
+}
+
+export type SettleGroupBy = 'payer' | 'payee'
+
+export interface CombineState {
+  receipts: CombineReceiptEntry[]
+  cashBackPercent: number
+  settleGroupBy: SettleGroupBy
+}
+
+/** A single-bill snapshot kept on-device so it can be added into a combine session without
+ *  re-exporting/re-uploading a PDF. */
+export interface SavedReceipt {
+  id: string
+  savedAt: string
+  bill: BillState
+}

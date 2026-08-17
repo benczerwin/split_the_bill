@@ -1,7 +1,9 @@
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
+import type { PDFPageProxy } from 'pdfjs-dist'
 import jsQR from 'jsqr'
 import type { BillState } from '../types'
-import { decodeBillFromQR } from './billCodec'
+import { BILL_QR_PREFIX, decodeBillFromQR } from './billCodec'
+import { COMBINE_QR_PREFIX, decodeCombineMetaFromQR } from './combineCodec'
 
 // Bundled locally (via Vite) rather than fetched from a CDN, so importing works offline
 // and doesn't depend on a third-party host being reachable.
@@ -31,54 +33,90 @@ function decodeFromCanvas(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext
   return jsQR(imageData.data, imageData.width, imageData.height)?.data ?? null
 }
 
-export async function importBillFromPDF(file: File): Promise<BillState> {
+async function decodeQRFromPage(page: PDFPageProxy): Promise<string | null> {
+  const viewport = page.getViewport({ scale: BASE_SCALE })
+
+  const fullCanvas = document.createElement('canvas')
+  fullCanvas.width = viewport.width
+  fullCanvas.height = viewport.height
+  const fullCtx = fullCanvas.getContext('2d')
+  if (!fullCtx) return null
+
+  await page.render({ canvasContext: fullCtx, viewport }).promise
+
+  const bandHeightPx = Math.min(fullCanvas.height, mmToPoints(QR_BAND_HEIGHT_MM) * BASE_SCALE)
+  const bandY = fullCanvas.height - bandHeightPx
+
+  for (const upscale of UPSCALE_FACTORS) {
+    const cropCanvas = document.createElement('canvas')
+    cropCanvas.width = fullCanvas.width * upscale
+    cropCanvas.height = bandHeightPx * upscale
+    const cropCtx = cropCanvas.getContext('2d')
+    if (!cropCtx) continue
+
+    cropCtx.imageSmoothingEnabled = false
+    cropCtx.drawImage(fullCanvas, 0, bandY, fullCanvas.width, bandHeightPx, 0, 0, cropCanvas.width, cropCanvas.height)
+
+    const data = decodeFromCanvas(cropCanvas, cropCtx)
+    if (data) return data
+  }
+
+  // Fallback for PDFs that don't match our own export layout (QR not in the bottom band):
+  // we already have the full page rendered at a safe scale, so just try that as-is too.
+  return decodeFromCanvas(fullCanvas, fullCtx)
+}
+
+async function loadPdfDocument(file: File) {
   const buffer = await file.arrayBuffer()
-  const pdf = await getDocument({ data: buffer }).promise
+  return getDocument({ data: buffer }).promise
+}
+
+export async function importBillFromPDF(file: File): Promise<BillState> {
+  const pdf = await loadPdfDocument(file)
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum)
-    const viewport = page.getViewport({ scale: BASE_SCALE })
-
-    const fullCanvas = document.createElement('canvas')
-    fullCanvas.width = viewport.width
-    fullCanvas.height = viewport.height
-    const fullCtx = fullCanvas.getContext('2d')
-    if (!fullCtx) continue
-
-    await page.render({ canvasContext: fullCtx, viewport }).promise
-
-    const bandHeightPx = Math.min(fullCanvas.height, mmToPoints(QR_BAND_HEIGHT_MM) * BASE_SCALE)
-    const bandY = fullCanvas.height - bandHeightPx
-
-    for (const upscale of UPSCALE_FACTORS) {
-      const cropCanvas = document.createElement('canvas')
-      cropCanvas.width = fullCanvas.width * upscale
-      cropCanvas.height = bandHeightPx * upscale
-      const cropCtx = cropCanvas.getContext('2d')
-      if (!cropCtx) continue
-
-      cropCtx.imageSmoothingEnabled = false
-      cropCtx.drawImage(
-        fullCanvas,
-        0,
-        bandY,
-        fullCanvas.width,
-        bandHeightPx,
-        0,
-        0,
-        cropCanvas.width,
-        cropCanvas.height,
-      )
-
-      const data = decodeFromCanvas(cropCanvas, cropCtx)
-      if (data) return decodeBillFromQR(data)
-    }
-
-    // Fallback for PDFs that don't match our own export layout (QR not in the bottom band):
-    // we already have the full page rendered at a safe scale, so just try that as-is too.
-    const data = decodeFromCanvas(fullCanvas, fullCtx)
+    const data = await decodeQRFromPage(page)
     if (data) return decodeBillFromQR(data)
   }
 
   throw new Error("Couldn't find a Split the Bill QR code in that PDF — make sure it was exported from this app.")
+}
+
+export interface ImportedCombineSession {
+  bills: BillState[]
+  payerIndices: (number | null)[]
+  cashBackPercent: number
+  settleGroupBy: 'payer' | 'payee'
+}
+
+export async function importCombinedFromPDF(file: File): Promise<ImportedCombineSession> {
+  const pdf = await loadPdfDocument(file)
+  const bills: BillState[] = []
+  let meta: ReturnType<typeof decodeCombineMetaFromQR> | null = null
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum)
+    const data = await decodeQRFromPage(page)
+    if (!data) continue
+    if (data.startsWith(BILL_QR_PREFIX)) {
+      bills.push(decodeBillFromQR(data))
+    } else if (data.startsWith(COMBINE_QR_PREFIX)) {
+      meta = decodeCombineMetaFromQR(data)
+    }
+  }
+
+  if (bills.length === 0) {
+    throw new Error("Couldn't find any receipts in that PDF — make sure it was exported from Combine Receipts.")
+  }
+  if (!meta) {
+    throw new Error('Found receipts but no combine summary page — make sure the whole exported PDF was uploaded.')
+  }
+
+  return {
+    bills,
+    payerIndices: meta.p,
+    cashBackPercent: meta.cb,
+    settleGroupBy: meta.gb === 1 ? 'payee' : 'payer',
+  }
 }
