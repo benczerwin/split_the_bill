@@ -3,6 +3,7 @@ import type { AppMode, BillState, CombineReceiptEntry, CombineState, Item, Settl
 import { computeSplit } from './lib/calculations'
 import {
   addToReceiptLibrary,
+  LIBRARY_LIMIT,
   loadApiKey,
   loadBillState,
   loadCombineState,
@@ -123,10 +124,18 @@ export default function App() {
     }))
   }
 
+  function switchMode(next: AppMode) {
+    setMode(next)
+    setImportNotice(null)
+  }
+
   function handleSaveToLibrary() {
     if (state.people.length === 0 && state.items.length === 0) return
     setLibrary((prev) => addToReceiptLibrary(prev, state))
-    setImportNotice({ kind: 'success', message: 'Saved to your receipt library — find it in Combine Receipts.' })
+    setImportNotice({
+      kind: 'success',
+      message: `Saved on this device. Find it under Combine Receipts → From your device (kept until you delete it or the ${LIBRARY_LIMIT} most recent bills fill up).`,
+    })
   }
 
   function handleClearAll() {
@@ -323,7 +332,7 @@ export default function App() {
         <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
           <button
             type="button"
-            onClick={() => setMode('single')}
+            onClick={() => switchMode('single')}
             className={`rounded-xl py-2 text-sm font-semibold transition ${
               mode === 'single' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'
             }`}
@@ -332,7 +341,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => setMode('combine')}
+            onClick={() => switchMode('combine')}
             className={`rounded-xl py-2 text-sm font-semibold transition ${
               mode === 'combine' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'
             }`}
@@ -343,14 +352,16 @@ export default function App() {
       </div>
 
       {importNotice && (
-        <div className="mx-auto mt-4 max-w-3xl px-4">
+        <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
           <div
-            className={`flex items-center justify-between rounded-lg px-4 py-2 text-sm ${
-              importNotice.kind === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+            className={`flex max-w-lg items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm shadow-lg ring-1 ${
+              importNotice.kind === 'success'
+                ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
+                : 'bg-red-50 text-red-700 ring-red-100'
             }`}
           >
             <span>{importNotice.message}</span>
-            <button type="button" onClick={() => setImportNotice(null)} className="ml-3 opacity-60 hover:opacity-100">
+            <button type="button" onClick={() => setImportNotice(null)} className="shrink-0 opacity-60 hover:opacity-100">
               &times;
             </button>
           </div>
@@ -406,7 +417,9 @@ export default function App() {
                 Save to library
               </button>
               <p className="mt-2 text-xs text-slate-400">
-                Keeps this bill on this device so you can add it into a Combine Receipts session later.
+                Saved only in this browser on this device — not synced anywhere. Kept until you delete it or the{' '}
+                {LIBRARY_LIMIT} most recent bills fill up, whichever comes first. Add it into a Combine Receipts
+                session anytime from &ldquo;From your device.&rdquo;
               </p>
             </section>
           </>

@@ -63,6 +63,17 @@ export default function CombinePage({
     })
   }
 
+  // If this library item is already in the combine list, the checkbox doubles as a shortcut to
+  // remove it from there — no need to scroll down to that receipt's own remove button.
+  function toggleLibraryItem(libraryId: string) {
+    const addedEntry = receipts.find((r) => r.libraryId === libraryId)
+    if (addedEntry) {
+      onRemoveReceipt(addedEntry.id)
+      return
+    }
+    toggleLibrarySelection(libraryId)
+  }
+
   function handleAddSelected() {
     onAddFromLibrary(Array.from(selectedLibraryIds))
     setSelectedLibraryIds(new Set())
@@ -99,19 +110,18 @@ export default function CombinePage({
                 const alreadyAdded = addedLibraryIds.has(item.id)
                 const checked = alreadyAdded || selectedLibraryIds.has(item.id)
                 return (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${alreadyAdded ? 'opacity-50' : 'hover:bg-slate-50'}`}
-                  >
-                    <label className="flex min-w-0 flex-1 items-center gap-2">
+                  <div key={item.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                    <label className="flex min-w-0 flex-1 items-center gap-2" title={alreadyAdded ? 'Uncheck to remove it from the list below' : undefined}>
                       <input
                         type="checkbox"
-                        disabled={alreadyAdded}
                         checked={checked}
-                        onChange={() => toggleLibrarySelection(item.id)}
+                        onChange={() => toggleLibraryItem(item.id)}
                         className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
                       />
                       <span className="min-w-0 flex-1 truncate text-slate-700">{item.bill.title || 'Untitled bill'}</span>
+                      {alreadyAdded && (
+                        <span className="shrink-0 text-xs font-medium text-emerald-600">Added</span>
+                      )}
                       <span className="shrink-0 text-xs text-slate-400">{item.bill.date}</span>
                     </label>
                     <button
