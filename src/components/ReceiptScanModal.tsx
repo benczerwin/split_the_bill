@@ -136,25 +136,25 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-800">Scan a receipt</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Scan a receipt</h2>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300" aria-label="Close">
             &times;
           </button>
         </div>
 
         {status !== 'ready' && (
           <div className="mt-4">
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-xs">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-xs dark:bg-slate-800">
               <button
                 type="button"
                 onClick={() => apiKey && setEngine('claude')}
                 disabled={!apiKey}
                 className={`rounded-md py-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                  engine === 'claude' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                  engine === 'claude' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
                 Claude
@@ -163,7 +163,7 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
                 type="button"
                 onClick={() => setEngine('paste')}
                 className={`rounded-md py-1.5 font-medium transition ${
-                  engine === 'paste' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                  engine === 'paste' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
                 Paste from AI
@@ -171,7 +171,7 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
             </div>
 
             {engine === 'claude' && !apiKey && (
-              <p className="mt-2 text-xs text-amber-700">
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
                 Needs an Anthropic API key.{' '}
                 <button type="button" onClick={onOpenSettings} className="font-medium underline">
                   Add one in Settings
@@ -180,7 +180,7 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
               </p>
             )}
             {engine === 'paste' && (
-              <p className="mt-2 text-xs text-slate-400">
+              <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
                 Copy this prompt into ChatGPT, Claude, or any AI with vision, along with a photo of your receipt,
                 then paste its reply below.
               </p>
@@ -189,13 +189,13 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
             {engine === 'paste' ? (
               <div className="mt-3">
                 <div className="relative">
-                  <pre className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 pr-16 font-mono text-[11px] leading-snug text-slate-600">
+                  <pre className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 pr-16 font-mono text-[11px] leading-snug text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     {PASTE_PROMPT}
                   </pre>
                   <button
                     type="button"
                     onClick={handleCopyPrompt}
-                    className="absolute right-2 top-2 rounded-md bg-white px-2 py-1 text-xs font-medium text-indigo-700 shadow ring-1 ring-slate-200 hover:bg-indigo-50"
+                    className="absolute right-2 top-2 rounded-md bg-white px-2 py-1 text-xs font-medium text-indigo-700 shadow ring-1 ring-slate-200 hover:bg-indigo-50 dark:bg-slate-900 dark:text-indigo-300 dark:ring-slate-700 dark:hover:bg-indigo-950"
                   >
                     {promptCopied ? 'Copied!' : 'Copy'}
                   </button>
@@ -206,17 +206,17 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
                   onPaste={handlePasteTextChange}
                   placeholder="Paste the AI's reply here…"
                   rows={6}
-                  className="mt-3 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className="mt-3 w-full rounded-lg border border-slate-300 p-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                 />
                 <button
                   type="button"
                   onClick={handleParsePaste}
                   disabled={!pasteText.trim()}
-                  className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="mt-2 w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                 >
                   Parse pasted text
                 </button>
-                {status === 'error' && <p className="mt-3 text-sm text-red-600">{error}</p>}
+                {status === 'error' && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
               </div>
             ) : (
               <>
@@ -234,11 +234,11 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
                   type="button"
                   onClick={() => inputRef.current?.click()}
                   disabled={status === 'loading'}
-                  className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-10 text-slate-500 hover:border-slate-400 disabled:opacity-60"
+                  className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-10 text-slate-500 hover:border-slate-400 disabled:opacity-60 dark:border-slate-600 dark:text-slate-400 dark:hover:border-slate-500"
                 >
                   {status === 'loading' ? (
                     <>
-                      <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+                      <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700 dark:border-slate-600 dark:border-t-slate-300" />
                       <span className="text-sm">Reading your receipt…</span>
                     </>
                   ) : (
@@ -248,7 +248,7 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
                     </>
                   )}
                 </button>
-                {status === 'error' && <p className="mt-3 text-sm text-red-600">{error}</p>}
+                {status === 'error' && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
               </>
             )}
           </div>
@@ -256,7 +256,7 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
 
         {status === 'ready' && (
           <div className="mt-4">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Review what we found, then apply it to your bill. Uncheck anything that isn&rsquo;t right.
             </p>
             <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
@@ -266,16 +266,16 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
                     type="checkbox"
                     checked={item.include}
                     onChange={(e) => updateDraft(index, { include: e.target.checked })}
-                    className="h-4 w-4 rounded border-slate-300"
+                    className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
                   />
                   <input
                     type="text"
                     value={item.name}
                     onChange={(e) => updateDraft(index, { name: e.target.value })}
-                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                   <div className="relative w-24 shrink-0">
-                    <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-slate-400">
+                    <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-slate-400 dark:text-slate-500">
                       $
                     </span>
                     <input
@@ -284,62 +284,62 @@ export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSett
                       value={item.price === 0 ? '' : item.price}
                       onChange={(e) => updateDraft(index, { price: e.target.valueAsNumber || 0 })}
                       onFocus={(e) => e.target.select()}
-                      className="w-full rounded-lg border border-slate-300 py-1 pl-5 pr-2 text-sm"
+                      className="w-full rounded-lg border border-slate-300 py-1 pl-5 pr-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                 </div>
               ))}
-              {draftItems.length === 0 && <p className="text-sm text-slate-400">No line items were found.</p>}
+              {draftItems.length === 0 && <p className="text-sm text-slate-400 dark:text-slate-500">No line items were found.</p>}
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
+              <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800">
                 <input
                   type="checkbox"
                   checked={applyTax}
                   disabled={taxValue === null}
                   onChange={(e) => setApplyTax(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
                 />
                 Tax: {taxValue !== null ? formatCurrency(taxValue, currency) : 'not found'}
               </label>
-              <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
+              <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800">
                 <input
                   type="checkbox"
                   checked={applyTip}
                   disabled={tipValue === null}
                   onChange={(e) => setApplyTip(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
                 />
                 Tip: {tipValue !== null ? formatCurrency(tipValue, currency) : 'not found'}
               </label>
-              <label className="col-span-2 flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
+              <label className="col-span-2 flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800">
                 <input
                   type="checkbox"
                   checked={applyDate}
                   disabled={dateValue === null}
                   onChange={(e) => setApplyDate(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
                 />
                 Date: {dateValue !== null ? formatDateOnly(dateValue) : 'not found'}
               </label>
             </div>
             {receipt?.total !== null && receipt?.total !== undefined && (
-              <p className="mt-2 text-xs text-slate-400">Receipt total (for reference): {formatCurrency(receipt.total, currency)}</p>
+              <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">Receipt total (for reference): {formatCurrency(receipt.total, currency)}</p>
             )}
 
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setStatus('idle')}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 Rescan
               </button>
               <button
                 type="button"
                 onClick={handleApply}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 Add to bill
               </button>

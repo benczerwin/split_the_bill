@@ -131,7 +131,7 @@ export default function SwipeToDelete({ onDelete, isOpen, onOpenChange, children
           transition: dragging ? 'none' : removing ? 'transform 0.16s ease-in' : 'transform 0.2s ease',
           touchAction: 'pan-y',
         }}
-        className="relative bg-white"
+        className="relative bg-white dark:bg-slate-900"
       >
         {children}
       </div>

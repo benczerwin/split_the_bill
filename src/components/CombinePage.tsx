@@ -90,9 +90,9 @@ export default function CombinePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-800">From your device ({library.length})</h2>
+          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">From your device ({library.length})</h2>
           {library.length > 0 && (
             <button
               type="button"
@@ -101,41 +101,42 @@ export default function CombinePage({
                   onClearLibrary()
                 }
               }}
-              className="text-xs font-medium text-slate-400 hover:text-red-500"
+              className="text-xs font-medium text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400"
             >
               Clear
             </button>
           )}
         </div>
         {library.length === 0 ? (
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
             Bills you clear or save from Single Bill mode appear here automatically, so you can add them into a
             combine session without exporting and re-uploading a PDF.
           </p>
         ) : (
           <>
-            <p className="mt-1 text-xs text-slate-400">Check a bill to add it below; uncheck to remove it.</p>
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Check a bill to add it below; uncheck to remove it.</p>
             <div className="mt-3 max-h-56 space-y-1 overflow-y-auto">
               {library.map((item) => {
                 const alreadyAdded = addedLibraryIds.has(item.id)
                 return (
-                  <div key={item.id} className="flex items-center gap-1 rounded-lg py-1 pl-2 pr-1 text-sm hover:bg-slate-50">
+                  <div key={item.id} className="flex items-center gap-1 rounded-lg py-1 pl-2 pr-1 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
                     <label className="flex min-w-0 flex-1 items-center gap-2 py-1">
                       <input
                         type="checkbox"
                         checked={alreadyAdded}
                         onChange={() => toggleLibraryItem(item.id)}
-                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600"
                       />
-                      <span className="min-w-0 flex-1 truncate text-slate-700">{item.bill.title || 'Untitled bill'}</span>
-                      {alreadyAdded && <span className="shrink-0 text-xs font-medium text-emerald-600">Added</span>}
-                      <span className="shrink-0 text-xs text-slate-400">{item.bill.date}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-slate-700 dark:text-slate-300">{item.bill.title || 'Untitled bill'}</span>
+                        <span className="block text-xs text-slate-400 dark:text-slate-500">{item.bill.date}</span>
+                      </span>
                     </label>
                     <button
                       type="button"
                       onClick={() => onEditLibraryItem(item.id)}
                       aria-label={`Edit ${item.bill.title || 'saved bill'}`}
-                      className="shrink-0 rounded-lg p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                      className="shrink-0 rounded-lg p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
                     >
                       <PencilIcon className="h-4 w-4" />
                     </button>
@@ -143,7 +144,7 @@ export default function CombinePage({
                       type="button"
                       onClick={() => onRemoveLibraryItem(item.id)}
                       aria-label={`Remove ${item.bill.title || 'saved bill'} from library`}
-                      className="shrink-0 rounded-lg p-2.5 text-lg leading-none text-slate-400 hover:bg-slate-100 hover:text-red-500"
+                      className="shrink-0 rounded-lg p-2.5 text-lg leading-none text-slate-400 hover:bg-slate-100 hover:text-red-500 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-red-400"
                     >
                       &times;
                     </button>
@@ -155,7 +156,7 @@ export default function CombinePage({
         )}
       </section>
 
-      <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
         <input
           ref={fileInputRef}
           type="file"
@@ -171,14 +172,14 @@ export default function CombinePage({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="rounded-xl border-2 border-dashed border-slate-300 py-6 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700"
+            className="rounded-xl border-2 border-dashed border-slate-300 py-6 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700 dark:border-slate-600 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200"
           >
             + Add receipt PDFs
           </button>
           <button
             type="button"
             onClick={onStartNewBillForCombine}
-            className="rounded-xl border-2 border-dashed border-slate-300 py-6 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700"
+            className="rounded-xl border-2 border-dashed border-slate-300 py-6 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700 dark:border-slate-600 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200"
           >
             + Build a new bill
           </button>
@@ -203,7 +204,7 @@ export default function CombinePage({
         )}
 
         {receipts.length === 0 && (
-          <p className="mt-4 text-center text-sm text-slate-400">
+          <p className="mt-4 text-center text-sm text-slate-400 dark:text-slate-500">
             No receipts yet — add some from your library above, upload a few exported PDFs, or build one from
             scratch.
           </p>
@@ -211,10 +212,10 @@ export default function CombinePage({
       </section>
 
       {combined.length > 0 && (
-        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold text-slate-800">Combined totals</h2>
-            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Combined totals</h2>
+            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
               Cash back
               <div className="relative">
                 <input
@@ -225,18 +226,18 @@ export default function CombinePage({
                   onChange={(e) => onCashBackPercentChange(e.target.valueAsNumber || 0)}
                   onFocus={(e) => e.target.select()}
                   placeholder="0"
-                  className="w-14 rounded-lg border border-slate-300 py-1 pl-2 pr-5 text-right text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className="w-14 rounded-lg border border-slate-300 py-1 pl-2 pr-5 text-right text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                 />
-                <span className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-xs text-slate-400">%</span>
+                <span className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-xs text-slate-400 dark:text-slate-500">%</span>
               </div>
             </label>
           </div>
 
           {mixedCurrencies && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               <span>
                 These receipts use different currencies — settling in{' '}
-                <span className="font-semibold text-slate-700">{combinedCurrency}</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{combinedCurrency}</span>
                 {ratesLoading && ' (fetching today’s rates…)'}
                 {ratesError && ` (couldn't fetch today's rates: ${ratesError})`}
               </span>
@@ -245,7 +246,7 @@ export default function CombinePage({
                 <select
                   value={currencyOverride ?? ''}
                   onChange={(e) => onCurrencyOverrideChange(e.target.value || null)}
-                  className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                 >
                   <option value="">Auto ({determineCombinedCurrency(receipts, null)})</option>
                   {CURRENCIES.map((c) => (
@@ -265,14 +266,14 @@ export default function CombinePage({
                 at the same height. */}
             <table className="shrink-0 border-collapse text-sm">
               <thead>
-                <tr className="h-9 border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-                  <th className="border-r border-slate-200 pr-4 font-medium">Person</th>
+                <tr className="h-9 border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700 dark:text-slate-500">
+                  <th className="border-r border-slate-200 pr-4 font-medium dark:border-slate-700">Person</th>
                 </tr>
               </thead>
               <tbody>
                 {combined.map((p) => (
-                  <tr key={p.key} className="h-11 border-b border-slate-100 last:border-0">
-                    <td className="border-r border-slate-200 pr-4">
+                  <tr key={p.key} className="h-11 border-b border-slate-100 last:border-0 dark:border-slate-800">
+                    <td className="border-r border-slate-200 pr-4 dark:border-slate-700">
                       <PersonTag name={p.name} colorIndex={p.colorIndex} size="sm" />
                     </td>
                   </tr>
@@ -283,7 +284,7 @@ export default function CombinePage({
             <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
               <table className="w-full min-w-max border-collapse text-sm">
                 <thead>
-                  <tr className="h-9 border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <tr className="h-9 border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700 dark:text-slate-500">
                     {doneEntries.map((entry) => (
                       <th
                         key={entry.id}
@@ -293,22 +294,22 @@ export default function CombinePage({
                         {entry.bill?.title || entry.fileName}
                       </th>
                     ))}
-                    <th className="pl-3 pr-3 font-semibold text-slate-600">Total</th>
+                    <th className="pl-3 pr-3 font-semibold text-slate-600 dark:text-slate-300">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {combined.map((p) => (
-                    <tr key={p.key} className="h-11 border-b border-slate-100 last:border-0">
+                    <tr key={p.key} className="h-11 border-b border-slate-100 last:border-0 dark:border-slate-800">
                       {doneEntries.map((entry) => (
-                        <td key={entry.id} className="pl-3 pr-3 text-slate-700">
+                        <td key={entry.id} className="pl-3 pr-3 text-slate-700 dark:text-slate-300">
                           {entry.id in p.perReceipt ? (
                             formatCurrency(p.perReceipt[entry.id], combinedCurrency)
                           ) : (
-                            <span className="text-slate-300">—</span>
+                            <span className="text-slate-300 dark:text-slate-600">—</span>
                           )}
                         </td>
                       ))}
-                      <td className="pl-3 pr-3 font-semibold text-slate-900">{formatCurrency(p.total, combinedCurrency)}</td>
+                      <td className="pl-3 pr-3 font-semibold text-slate-900 dark:text-white">{formatCurrency(p.total, combinedCurrency)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -316,29 +317,33 @@ export default function CombinePage({
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 p-4 text-sm">
-            <span className="text-slate-500">
+          <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800">
+            <span className="text-slate-500 dark:text-slate-400">
               {doneEntries.length} receipt{doneEntries.length === 1 ? '' : 's'} combined
             </span>
-            <span className="font-semibold text-slate-800">Grand total: {formatCurrency(grandTotal, combinedCurrency)}</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-100">Grand total: {formatCurrency(grandTotal, combinedCurrency)}</span>
           </div>
 
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-slate-800">Balances</h3>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Balances</h3>
             {missingPayerCount > 0 && (
-              <p className="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              <p className="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-400">
                 {missingPayerCount} of {doneEntries.length} receipt{missingPayerCount === 1 ? '' : 's'} don&rsquo;t have
                 a payer set — mark who paid each one for accurate balances.
               </p>
             )}
             <div className="mt-3 space-y-1.5">
               {balances.map((b) => (
-                <div key={b.key} className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+                <div key={b.key} className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm dark:bg-slate-800">
                   <div className="flex items-center justify-between gap-2">
                     <PersonTag name={b.name} colorIndex={b.colorIndex} size="sm" />
                     <span
                       className={`font-semibold ${
-                        b.net > SETTLEMENT_EPSILON ? 'text-emerald-600' : b.net < -SETTLEMENT_EPSILON ? 'text-red-600' : 'text-slate-400'
+                        b.net > SETTLEMENT_EPSILON
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : b.net < -SETTLEMENT_EPSILON
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-slate-400 dark:text-slate-500'
                       }`}
                     >
                       {b.net > SETTLEMENT_EPSILON
@@ -348,23 +353,25 @@ export default function CombinePage({
                           : 'settled up'}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                     paid {formatCurrency(b.paid, combinedCurrency)} · owes {formatCurrency(b.owed, combinedCurrency)}
                   </p>
                 </div>
               ))}
             </div>
 
-            <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Suggested settlements</h4>
+            <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Suggested settlements</h4>
             {settlements.length > 0 && (
               <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-400">Group by</span>
-                <div className="inline-flex rounded-full border border-slate-200 bg-slate-100 p-0.5 text-xs">
+                <span className="text-xs text-slate-400 dark:text-slate-500">Group by</span>
+                <div className="inline-flex rounded-full border border-slate-200 bg-slate-100 p-0.5 text-xs dark:border-slate-700 dark:bg-slate-800">
                   <button
                     type="button"
                     onClick={() => onSettleGroupByChange('payer')}
                     className={`rounded-full px-3 py-1 font-medium transition ${
-                      settleGroupBy === 'payer' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                      settleGroupBy === 'payer'
+                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-600 dark:text-white'
+                        : 'text-slate-500 dark:text-slate-400'
                     }`}
                   >
                     Who pays
@@ -373,7 +380,9 @@ export default function CombinePage({
                     type="button"
                     onClick={() => onSettleGroupByChange('payee')}
                     className={`rounded-full px-3 py-1 font-medium transition ${
-                      settleGroupBy === 'payee' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                      settleGroupBy === 'payee'
+                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-600 dark:text-white'
+                        : 'text-slate-500 dark:text-slate-400'
                     }`}
                   >
                     Who&rsquo;s owed
@@ -385,14 +394,14 @@ export default function CombinePage({
               <div className="mt-2 space-y-3">
                 {groupedSettlements.map(([name, items]) => (
                   <div key={name}>
-                    <p className="text-xs font-semibold text-slate-600">{name}</p>
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">{name}</p>
                     <ul className="mt-1 space-y-1.5">
                       {items.map((s, idx) => (
                         <li
                           key={idx}
-                          className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                          className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700"
                         >
-                          <span className="text-slate-700">
+                          <span className="text-slate-700 dark:text-slate-300">
                             {settleGroupBy === 'payer' ? (
                               <>
                                 pays <span className="font-medium">{s.toName}</span>
@@ -403,7 +412,7 @@ export default function CombinePage({
                               </>
                             )}
                           </span>
-                          <span className="font-semibold text-slate-900">{formatCurrency(s.amount, combinedCurrency)}</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(s.amount, combinedCurrency)}</span>
                         </li>
                       ))}
                     </ul>
@@ -411,7 +420,7 @@ export default function CombinePage({
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-sm text-slate-400">Everyone&rsquo;s settled up.</p>
+              <p className="mt-2 text-sm text-slate-400 dark:text-slate-500">Everyone&rsquo;s settled up.</p>
             )}
           </div>
         </section>

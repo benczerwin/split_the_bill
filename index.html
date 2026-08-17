@@ -7,6 +7,16 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%F0%9F%A7%BE</text></svg>" />
     <title>Split the Bill</title>
     <meta name="description" content="Split a bill fairly by item, person, tax, tip, and cash-back — scan a receipt to get started fast." />
+    <script>
+      // Applied before React mounts so there's no flash of the wrong theme on load.
+      (function () {
+        try {
+          var stored = localStorage.getItem('split-the-bill:theme:v1')
+          var isDark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', isDark)
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

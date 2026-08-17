@@ -19,13 +19,13 @@ export default function PeopleManager({ people, onAdd, onRemove }: PeopleManager
   }
 
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-      <h2 className="text-base font-semibold text-slate-800">Who&rsquo;s splitting the bill?</h2>
+    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+      <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Who&rsquo;s splitting the bill?</h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {people.map((person) => (
           <PersonTag key={person.id} name={person.name} colorIndex={person.colorIndex} onRemove={() => onRemove(person.id)} />
         ))}
-        {people.length === 0 && <p className="text-sm text-slate-400">Add everyone splitting the bill below.</p>}
+        {people.length === 0 && <p className="text-sm text-slate-400 dark:text-slate-500">Add everyone splitting the bill below.</p>}
       </div>
       <div className="mt-4 flex gap-2">
         <input
@@ -39,12 +39,12 @@ export default function PeopleManager({ people, onAdd, onRemove }: PeopleManager
             }
           }}
           placeholder="Add a person's name"
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
         <button
           type="button"
           onClick={handleAdd}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
         >
           Add
         </button>

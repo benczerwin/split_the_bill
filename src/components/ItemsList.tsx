@@ -31,19 +31,19 @@ export default function ItemsList({
   const [openItemId, setOpenItemId] = useState<string | null>(null)
 
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-slate-800">Items</h2>
+        <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Items</h2>
         <button
           type="button"
           onClick={onScanReceipt}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+          className="flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
         >
           <CameraIcon className="h-4 w-4" />
           Scan receipt
         </button>
       </div>
-      <p className="mt-1 text-xs text-slate-400">
+      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
         Tap the &ldquo;Everyone&rdquo; pill or specific names to control who splits each item. Swipe an item left to
         delete it.
       </p>
@@ -66,7 +66,7 @@ export default function ItemsList({
           </SwipeToDelete>
         ))}
         {items.length === 0 && (
-          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400">
+          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-400 dark:border-slate-600 dark:text-slate-500">
             No items yet. Add one, or scan a receipt.
           </p>
         )}
@@ -76,12 +76,12 @@ export default function ItemsList({
         <button
           type="button"
           onClick={onAdd}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           + Add item
         </button>
-        <p className="text-sm text-slate-600">
-          Subtotal: <span className="font-semibold text-slate-900">{formatCurrency(subtotal, currency)}</span>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Subtotal: <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(subtotal, currency)}</span>
         </p>
       </div>
     </section>

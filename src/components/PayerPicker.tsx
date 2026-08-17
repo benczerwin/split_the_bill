@@ -9,9 +9,9 @@ interface PayerPickerProps {
 
 export default function PayerPicker({ people, payerId, onChange }: PayerPickerProps) {
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-      <h2 className="text-base font-semibold text-slate-800">Who paid this bill?</h2>
-      <p className="mt-1 text-xs text-slate-400">
+    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+      <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Who paid this bill?</h2>
+      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
         Carries over automatically if you add this bill into a Combine Receipts session.
       </p>
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -34,7 +34,7 @@ export default function PayerPicker({ people, payerId, onChange }: PayerPickerPr
             </button>
           )
         })}
-        {people.length === 0 && <span className="text-xs text-slate-400">Add people above first.</span>}
+        {people.length === 0 && <span className="text-xs text-slate-400 dark:text-slate-500">Add people above first.</span>}
       </div>
     </section>
   )

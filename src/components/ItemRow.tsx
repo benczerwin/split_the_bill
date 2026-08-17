@@ -28,17 +28,17 @@ export default function ItemRow({ item, people, currencySymbol, onChange, onDele
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 p-3">
+    <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
       <div className="flex items-start gap-2">
         <input
           type="text"
           value={item.name}
           onChange={(e) => onChange({ name: e.target.value })}
           placeholder="Item name"
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
         <div className="relative w-28 shrink-0">
-          <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-sm text-slate-400">
+          <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-sm text-slate-400 dark:text-slate-500">
             {currencySymbol}
           </span>
           <input
@@ -49,14 +49,14 @@ export default function ItemRow({ item, people, currencySymbol, onChange, onDele
             onChange={(e) => onChange({ price: e.target.valueAsNumber || 0 })}
             onFocus={(e) => e.target.select()}
             placeholder="0.00"
-            className="w-full rounded-lg border border-slate-300 py-1.5 pl-8 pr-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+            className="w-full rounded-lg border border-slate-300 py-1.5 pl-8 pr-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           />
         </div>
         <button
           type="button"
           onClick={onDelete}
           aria-label={`Delete ${item.name || 'item'}`}
-          className="shrink-0 rounded-lg px-2 py-1.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-red-500"
+          className="shrink-0 rounded-lg px-2 py-1.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-red-500 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-red-400"
         >
           &times;
         </button>
@@ -67,8 +67,8 @@ export default function ItemRow({ item, people, currencySymbol, onChange, onDele
           onClick={toggleEveryone}
           className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
             isEveryone
-              ? 'border-slate-900 bg-slate-900 text-white'
-              : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
+              ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900'
+              : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-slate-500'
           }`}
         >
           Everyone
@@ -92,7 +92,7 @@ export default function ItemRow({ item, people, currencySymbol, onChange, onDele
             </button>
           )
         })}
-        {people.length === 0 && <span className="text-xs text-slate-400">Add people to assign this item.</span>}
+        {people.length === 0 && <span className="text-xs text-slate-400 dark:text-slate-500">Add people to assign this item.</span>}
       </div>
     </div>
   )
