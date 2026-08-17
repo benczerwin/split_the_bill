@@ -123,6 +123,12 @@ export default function App() {
     }))
   }
 
+  function handleSaveToLibrary() {
+    if (state.people.length === 0 && state.items.length === 0) return
+    setLibrary((prev) => addToReceiptLibrary(prev, state))
+    setImportNotice({ kind: 'success', message: 'Saved to your receipt library — find it in Combine Receipts.' })
+  }
+
   function handleClearAll() {
     if (mode === 'single') {
       const hasData = state.people.length > 0 || state.items.length > 0 || state.title.trim() !== ''
@@ -299,11 +305,7 @@ export default function App() {
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
           <div>
             <h1 className="text-lg font-bold text-slate-900">Split the Bill</h1>
-            <p className="text-xs text-slate-400">
-              {mode === 'single'
-                ? 'Fairly split a bill by item, including tax, tip & cash back.'
-                : 'Combine multiple receipts to see who owes who what overall.'}
-            </p>
+            <p className="text-xs text-slate-400">Split a bill fairly, alone or combined across receipts.</p>
           </div>
           <HeaderMenu
             mode={mode}
@@ -317,13 +319,13 @@ export default function App() {
         </div>
       </header>
 
-      <div className="mx-auto mt-4 flex max-w-3xl justify-center px-4">
-        <div className="inline-flex rounded-full border border-slate-200 bg-slate-100 p-1 text-sm">
+      <div className="mx-auto mt-4 max-w-3xl px-4">
+        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
           <button
             type="button"
             onClick={() => setMode('single')}
-            className={`rounded-full px-4 py-1.5 font-medium transition ${
-              mode === 'single' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+            className={`rounded-xl py-2 text-sm font-semibold transition ${
+              mode === 'single' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'
             }`}
           >
             Single bill
@@ -331,8 +333,8 @@ export default function App() {
           <button
             type="button"
             onClick={() => setMode('combine')}
-            className={`rounded-full px-4 py-1.5 font-medium transition ${
-              mode === 'combine' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+            className={`rounded-xl py-2 text-sm font-semibold transition ${
+              mode === 'combine' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'
             }`}
           >
             Combine receipts
@@ -394,6 +396,19 @@ export default function App() {
               onCashBackChange={(cashBackPercent) => setState((prev) => ({ ...prev, cashBackPercent }))}
             />
             <ResultsPanel summary={summary} tax={state.tax} paid={state.paid} onTogglePaid={togglePaid} />
+            <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200">
+              <button
+                type="button"
+                onClick={handleSaveToLibrary}
+                disabled={state.people.length === 0 && state.items.length === 0}
+                className="w-full rounded-xl border border-slate-300 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              >
+                Save to library
+              </button>
+              <p className="mt-2 text-xs text-slate-400">
+                Keeps this bill on this device so you can add it into a Combine Receipts session later.
+              </p>
+            </section>
           </>
         ) : (
           <CombinePage
