@@ -1,16 +1,7 @@
 import { useRef, useState } from 'react'
-import type { BillState, SplitSummary } from '../types'
 import { computeSplit, formatCurrency } from '../lib/calculations'
 import PersonTag from './PersonTag'
-
-interface ReceiptEntry {
-  id: string
-  fileName: string
-  status: 'loading' | 'done' | 'error'
-  error?: string
-  bill?: BillState
-  summary?: SplitSummary
-}
+import ReceiptSection, { type ReceiptEntry } from './ReceiptSection'
 
 interface CombinedPerson {
   key: string
@@ -19,6 +10,23 @@ interface CombinedPerson {
   perReceipt: Record<string, number>
   total: number
 }
+
+interface Balance {
+  key: string
+  name: string
+  colorIndex: number
+  paid: number
+  owed: number
+  net: number
+}
+
+interface Settlement {
+  fromName: string
+  toName: string
+  amount: number
+}
+
+const EPSILON = 0.005
 
 function uid(): string {
   return crypto.randomUUID()
@@ -43,6 +51,58 @@ function buildCombined(entries: ReceiptEntry[], useCashBack: boolean): CombinedP
   return Array.from(byKey.values()).sort((a, b) => b.total - a.total)
 }
 
+// Balances always use the full bill total for what a payer fronted — cash back is a discount the
+// payer chooses to offer people paying them back in cash, it doesn't change what was actually
+// handed to the restaurant.
+function buildBalances(entries: ReceiptEntry[], combined: CombinedPerson[]): Balance[] {
+  const byKey = new Map<string, Balance>()
+  for (const c of combined) {
+    byKey.set(c.key, { key: c.key, name: c.name, colorIndex: c.colorIndex, paid: 0, owed: c.total, net: 0 })
+  }
+  for (const entry of entries) {
+    if (entry.status !== 'done' || !entry.bill || !entry.summary || !entry.payerId) continue
+    const payer = entry.bill.people.find((p) => p.id === entry.payerId)
+    if (!payer) continue
+    const key = payer.name.trim().toLowerCase()
+    let balance = byKey.get(key)
+    if (!balance) {
+      balance = { key, name: payer.name.trim(), colorIndex: byKey.size, paid: 0, owed: 0, net: 0 }
+      byKey.set(key, balance)
+    }
+    balance.paid += entry.summary.totalWithTaxTip
+  }
+  for (const balance of byKey.values()) balance.net = balance.paid - balance.owed
+  return Array.from(byKey.values()).sort((a, b) => b.net - a.net)
+}
+
+// Greedily matches the biggest creditor against the biggest debtor until every balance is
+// settled — a standard debt-simplification approach that keeps the payment list short.
+function simplifySettlements(balances: Balance[]): Settlement[] {
+  const creditors = balances
+    .filter((b) => b.net > EPSILON)
+    .map((b) => ({ name: b.name, amount: b.net }))
+    .sort((a, b) => b.amount - a.amount)
+  const debtors = balances
+    .filter((b) => b.net < -EPSILON)
+    .map((b) => ({ name: b.name, amount: -b.net }))
+    .sort((a, b) => b.amount - a.amount)
+
+  const settlements: Settlement[] = []
+  let i = 0
+  let j = 0
+  while (i < creditors.length && j < debtors.length) {
+    const creditor = creditors[i]
+    const debtor = debtors[j]
+    const amount = Math.min(creditor.amount, debtor.amount)
+    if (amount > EPSILON) settlements.push({ fromName: debtor.name, toName: creditor.name, amount })
+    creditor.amount -= amount
+    debtor.amount -= amount
+    if (creditor.amount <= EPSILON) i++
+    if (debtor.amount <= EPSILON) j++
+  }
+  return settlements
+}
+
 interface CombineReceiptsModalProps {
   onClose: () => void
 }
@@ -55,11 +115,20 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
   const doneEntries = entries.filter((e) => e.status === 'done')
   const combined = buildCombined(entries, useCashBack)
   const grandTotal = combined.reduce((sum, p) => sum + p.total, 0)
+  const balances = buildBalances(entries, combined)
+  const settlements = simplifySettlements(balances)
+  const missingPayerCount = doneEntries.filter((e) => !e.payerId).length
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return
     const files = Array.from(fileList)
-    const newEntries: ReceiptEntry[] = files.map((file) => ({ id: uid(), fileName: file.name, status: 'loading' }))
+    const newEntries: ReceiptEntry[] = files.map((file) => ({
+      id: uid(),
+      fileName: file.name,
+      status: 'loading',
+      payerId: null,
+      expanded: true,
+    }))
     setEntries((prev) => [...prev, ...newEntries])
 
     const { importBillFromPDF } = await import('../lib/pdfImport')
@@ -87,6 +156,14 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
     setEntries((prev) => prev.filter((e) => e.id !== id))
   }
 
+  function toggleExpanded(id: string) {
+    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, expanded: !e.expanded } : e)))
+  }
+
+  function setPayer(id: string, payerId: string | null) {
+    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, payerId } : e)))
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
@@ -97,7 +174,7 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
           <div>
             <h2 className="text-lg font-semibold text-slate-800">Combine receipts</h2>
             <p className="text-xs text-slate-400">
-              Upload a bunch of exported bill PDFs to see each person&rsquo;s total across all of them.
+              Upload exported bill PDFs, mark who paid each one, and see who owes who what overall.
             </p>
           </div>
           <button
@@ -131,37 +208,17 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
           </button>
 
           {entries.length > 0 && (
-            <ul className="mt-4 space-y-1.5">
+            <div className="mt-4 space-y-2">
               {entries.map((entry) => (
-                <li
+                <ReceiptSection
                   key={entry.id}
-                  className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm ${
-                    entry.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <span className="min-w-0 truncate">
-                    {entry.status === 'done' && entry.bill ? entry.bill.title || entry.fileName : entry.fileName}
-                    {entry.status === 'error' && ` — ${entry.error}`}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    {entry.status === 'loading' && (
-                      <span className="block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-                    )}
-                    {entry.status === 'done' && entry.summary && (
-                      <span className="font-medium text-slate-500">{formatCurrency(entry.summary.totalWithTaxTip)}</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeEntry(entry.id)}
-                      className="rounded-full px-1.5 text-slate-400 hover:text-red-500"
-                      aria-label={`Remove ${entry.fileName}`}
-                    >
-                      &times;
-                    </button>
-                  </span>
-                </li>
+                  entry={entry}
+                  onRemove={() => removeEntry(entry.id)}
+                  onToggleExpanded={() => toggleExpanded(entry.id)}
+                  onSetPayer={(payerId) => setPayer(entry.id, payerId)}
+                />
               ))}
-            </ul>
+            </div>
           )}
 
           {combined.length > 0 && (
@@ -238,6 +295,48 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
                   {doneEntries.length} receipt{doneEntries.length === 1 ? '' : 's'} combined
                 </span>
                 <span className="font-semibold text-slate-800">Grand total: {formatCurrency(grandTotal)}</span>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-slate-800">Balances</h3>
+                {missingPayerCount > 0 && (
+                  <p className="mt-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    {missingPayerCount} of {doneEntries.length} receipt{missingPayerCount === 1 ? '' : 's'} don&rsquo;t
+                    have a payer set — mark who paid each one for accurate balances.
+                  </p>
+                )}
+                <div className="mt-3 space-y-1.5">
+                  {balances.map((b) => (
+                    <div key={b.key} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                      <PersonTag name={b.name} colorIndex={b.colorIndex} size="sm" />
+                      <span className="text-xs text-slate-400">
+                        paid {formatCurrency(b.paid)} · owes {formatCurrency(b.owed)}
+                      </span>
+                      <span className={`font-semibold ${b.net > EPSILON ? 'text-emerald-600' : b.net < -EPSILON ? 'text-red-600' : 'text-slate-400'}`}>
+                        {b.net > EPSILON ? `is owed ${formatCurrency(b.net)}` : b.net < -EPSILON ? `owes ${formatCurrency(-b.net)}` : 'settled up'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Suggested settlements
+                </h4>
+                {settlements.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5">
+                    {settlements.map((s, idx) => (
+                      <li key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                        <span className="text-slate-700">
+                          <span className="font-medium">{s.fromName}</span> pays{' '}
+                          <span className="font-medium">{s.toName}</span>
+                        </span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(s.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-400">Everyone&rsquo;s settled up.</p>
+                )}
               </div>
             </div>
           )}

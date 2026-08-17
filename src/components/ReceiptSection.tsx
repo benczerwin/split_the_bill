@@ -1,0 +1,165 @@
+import type { BillState, SplitSummary } from '../types'
+import { formatCurrency } from '../lib/calculations'
+import { colorForIndex } from '../lib/palette'
+import PersonTag from './PersonTag'
+import { ChevronDownIcon } from './icons'
+
+export interface ReceiptEntry {
+  id: string
+  fileName: string
+  status: 'loading' | 'done' | 'error'
+  error?: string
+  bill?: BillState
+  summary?: SplitSummary
+  /** Person id (within this receipt's own people list) who fronted the money, or null if unset. */
+  payerId: string | null
+  expanded: boolean
+}
+
+interface ReceiptSectionProps {
+  entry: ReceiptEntry
+  onRemove: () => void
+  onToggleExpanded: () => void
+  onSetPayer: (personId: string | null) => void
+}
+
+export default function ReceiptSection({ entry, onRemove, onToggleExpanded, onSetPayer }: ReceiptSectionProps) {
+  const label = entry.status === 'done' && entry.bill ? entry.bill.title || entry.fileName : entry.fileName
+  const canExpand = entry.status === 'done'
+
+  return (
+    <div className={`rounded-xl border ${entry.status === 'error' ? 'border-red-200' : 'border-slate-200'}`}>
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          disabled={!canExpand}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
+        >
+          {entry.status === 'loading' && (
+            <span className="block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+          )}
+          {canExpand && (
+            <ChevronDownIcon
+              className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${entry.expanded ? '' : '-rotate-90'}`}
+            />
+          )}
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{label}</span>
+          {entry.bill?.date && <span className="shrink-0 text-xs text-slate-400">{entry.bill.date}</span>}
+        </button>
+        {entry.status === 'done' && entry.summary && (
+          <span className="shrink-0 text-sm font-semibold text-slate-700">
+            {formatCurrency(entry.summary.totalWithTaxTip)}
+          </span>
+        )}
+        {entry.status === 'done' && !entry.payerId && (
+          <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">
+            No payer
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${label}`}
+          className="shrink-0 rounded-full px-1.5 text-slate-400 hover:text-red-500"
+        >
+          &times;
+        </button>
+      </div>
+
+      {entry.status === 'error' && (
+        <p className="border-t border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">{entry.error}</p>
+      )}
+
+      {canExpand && entry.expanded && entry.bill && entry.summary && (
+        <div className="space-y-4 border-t border-slate-100 px-3 py-3">
+          <div>
+            <p className="text-xs font-medium text-slate-500">Who paid this bill?</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {entry.bill.people.map((person) => {
+                const active = entry.payerId === person.id
+                const swatch = colorForIndex(person.colorIndex)
+                return (
+                  <button
+                    key={person.id}
+                    type="button"
+                    onClick={() => onSetPayer(active ? null : person.id)}
+                    className="rounded-full border px-2.5 py-1 text-xs font-medium transition"
+                    style={
+                      active
+                        ? { backgroundColor: swatch.ring, borderColor: swatch.ring, color: 'white' }
+                        : { backgroundColor: 'white', borderColor: '#cbd5e1', color: '#64748b' }
+                    }
+                  >
+                    {person.name}
+                  </button>
+                )
+              })}
+              {entry.bill.people.length === 0 && (
+                <span className="text-xs text-slate-400">No people on this receipt.</span>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[360px] border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-left uppercase tracking-wide text-slate-400">
+                  <th className="py-1.5 pr-3 font-medium">Item</th>
+                  <th className="py-1.5 pr-3 font-medium">Price</th>
+                  <th className="py-1.5 pr-3 font-medium">Who</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entry.bill.items.map((item) => (
+                  <tr key={item.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-1.5 pr-3 text-slate-700">{item.name || 'Untitled item'}</td>
+                    <td className="py-1.5 pr-3 text-slate-700">{formatCurrency(item.price)}</td>
+                    <td className="py-1.5 pr-3 text-slate-500">
+                      {item.assignedTo.length === 0
+                        ? 'Everyone'
+                        : item.assignedTo
+                            .map((pid) => entry.bill?.people.find((p) => p.id === pid)?.name)
+                            .filter(Boolean)
+                            .join(', ')}
+                    </td>
+                  </tr>
+                ))}
+                {entry.bill.items.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="py-2 text-center text-slate-400">
+                      No items.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[360px] border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-left uppercase tracking-wide text-slate-400">
+                  <th className="py-1.5 pr-3 font-medium">Person</th>
+                  <th className="py-1.5 pr-3 font-medium">Owes</th>
+                  <th className="py-1.5 pr-3 font-medium">With cash back</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entry.summary.results.map((r) => (
+                  <tr key={r.person.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-1.5 pr-3">
+                      <PersonTag name={r.person.name} colorIndex={r.person.colorIndex} size="sm" />
+                    </td>
+                    <td className="py-1.5 pr-3 font-medium text-slate-900">{formatCurrency(r.costWithTaxTip)}</td>
+                    <td className="py-1.5 pr-3 font-medium text-emerald-600">{formatCurrency(r.costWithCashBack)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
