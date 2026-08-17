@@ -26,13 +26,30 @@ interface Settlement {
   amount: number
 }
 
+type SettleGroupBy = 'payer' | 'payee'
+
 const EPSILON = 0.005
 
 function uid(): string {
   return crypto.randomUUID()
 }
 
-function buildCombined(entries: ReceiptEntry[], useCashBack: boolean): CombinedPerson[] {
+// One shared color per person name across the whole combine view — each bill assigned its
+// own colorIndex independently when it was created, so without this the same person could
+// show up in a different color in each receipt section vs. the combined tables.
+function buildNameColorMap(entries: ReceiptEntry[]): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const entry of entries) {
+    if (entry.status !== 'done' || !entry.bill) continue
+    for (const person of entry.bill.people) {
+      const key = person.name.trim().toLowerCase()
+      if (!map.has(key)) map.set(key, map.size)
+    }
+  }
+  return map
+}
+
+function buildCombined(entries: ReceiptEntry[], nameColorMap: Map<string, number>, useCashBack: boolean): CombinedPerson[] {
   const byKey = new Map<string, CombinedPerson>()
   for (const entry of entries) {
     if (entry.status !== 'done' || !entry.summary) continue
@@ -40,7 +57,7 @@ function buildCombined(entries: ReceiptEntry[], useCashBack: boolean): CombinedP
       const key = r.person.name.trim().toLowerCase()
       let combined = byKey.get(key)
       if (!combined) {
-        combined = { key, name: r.person.name.trim(), colorIndex: byKey.size, perReceipt: {}, total: 0 }
+        combined = { key, name: r.person.name.trim(), colorIndex: nameColorMap.get(key) ?? byKey.size, perReceipt: {}, total: 0 }
         byKey.set(key, combined)
       }
       const amount = useCashBack ? r.costWithCashBack : r.costWithTaxTip
@@ -54,7 +71,7 @@ function buildCombined(entries: ReceiptEntry[], useCashBack: boolean): CombinedP
 // Balances always use the full bill total for what a payer fronted — cash back is a discount the
 // payer chooses to offer people paying them back in cash, it doesn't change what was actually
 // handed to the restaurant.
-function buildBalances(entries: ReceiptEntry[], combined: CombinedPerson[]): Balance[] {
+function buildBalances(entries: ReceiptEntry[], combined: CombinedPerson[], nameColorMap: Map<string, number>): Balance[] {
   const byKey = new Map<string, Balance>()
   for (const c of combined) {
     byKey.set(c.key, { key: c.key, name: c.name, colorIndex: c.colorIndex, paid: 0, owed: c.total, net: 0 })
@@ -66,7 +83,7 @@ function buildBalances(entries: ReceiptEntry[], combined: CombinedPerson[]): Bal
     const key = payer.name.trim().toLowerCase()
     let balance = byKey.get(key)
     if (!balance) {
-      balance = { key, name: payer.name.trim(), colorIndex: byKey.size, paid: 0, owed: 0, net: 0 }
+      balance = { key, name: payer.name.trim(), colorIndex: nameColorMap.get(key) ?? byKey.size, paid: 0, owed: 0, net: 0 }
       byKey.set(key, balance)
     }
     balance.paid += entry.summary.totalWithTaxTip
@@ -103,6 +120,16 @@ function simplifySettlements(balances: Balance[]): Settlement[] {
   return settlements
 }
 
+function groupSettlements(settlements: Settlement[], groupBy: SettleGroupBy): [string, Settlement[]][] {
+  const groups = new Map<string, Settlement[]>()
+  for (const s of settlements) {
+    const key = groupBy === 'payer' ? s.fromName : s.toName
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(s)
+  }
+  return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+}
+
 interface CombineReceiptsModalProps {
   onClose: () => void
 }
@@ -110,13 +137,16 @@ interface CombineReceiptsModalProps {
 export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalProps) {
   const [entries, setEntries] = useState<ReceiptEntry[]>([])
   const [useCashBack, setUseCashBack] = useState(false)
+  const [settleGroupBy, setSettleGroupBy] = useState<SettleGroupBy>('payer')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const doneEntries = entries.filter((e) => e.status === 'done')
-  const combined = buildCombined(entries, useCashBack)
+  const nameColorMap = buildNameColorMap(entries)
+  const combined = buildCombined(entries, nameColorMap, useCashBack)
   const grandTotal = combined.reduce((sum, p) => sum + p.total, 0)
-  const balances = buildBalances(entries, combined)
+  const balances = buildBalances(entries, combined, nameColorMap)
   const settlements = simplifySettlements(balances)
+  const groupedSettlements = groupSettlements(settlements, settleGroupBy)
   const missingPayerCount = doneEntries.filter((e) => !e.payerId).length
 
   async function handleFiles(fileList: FileList | null) {
@@ -213,6 +243,7 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
                 <ReceiptSection
                   key={entry.id}
                   entry={entry}
+                  nameColorMap={nameColorMap}
                   onRemove={() => removeEntry(entry.id)}
                   onToggleExpanded={() => toggleExpanded(entry.id)}
                   onSetPayer={(payerId) => setPayer(entry.id, payerId)}
@@ -237,16 +268,20 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
               </div>
 
               <div className="mt-3 flex items-start">
+                {/* Frozen name column — a separate table outside the scroll area. Row heights are
+                    forced equal (h-9/h-11) so this table's lines stay aligned with the scrollable
+                    one, since a plain PersonTag pill and a currency string don't naturally render
+                    at the same height. */}
                 <table className="shrink-0 border-collapse text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-                      <th className="border-r border-slate-200 py-2 pr-4 font-medium">Person</th>
+                    <tr className="h-9 border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                      <th className="border-r border-slate-200 pr-4 font-medium">Person</th>
                     </tr>
                   </thead>
                   <tbody>
                     {combined.map((p) => (
-                      <tr key={p.key} className="border-b border-slate-100 last:border-0">
-                        <td className="border-r border-slate-200 py-2.5 pr-4">
+                      <tr key={p.key} className="h-11 border-b border-slate-100 last:border-0">
+                        <td className="border-r border-slate-200 pr-4">
                           <PersonTag name={p.name} colorIndex={p.colorIndex} size="sm" />
                         </td>
                       </tr>
@@ -257,24 +292,24 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
                 <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
                   <table className="w-full min-w-max border-collapse text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                      <tr className="h-9 border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
                         {doneEntries.map((entry) => (
                           <th
                             key={entry.id}
-                            className="max-w-[7rem] truncate py-2 pl-3 pr-3 font-medium"
+                            className="max-w-[7rem] truncate pl-3 pr-3 font-medium"
                             title={entry.bill?.title || entry.fileName}
                           >
                             {entry.bill?.title || entry.fileName}
                           </th>
                         ))}
-                        <th className="py-2 pl-3 pr-3 font-semibold text-slate-600">Total</th>
+                        <th className="pl-3 pr-3 font-semibold text-slate-600">Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {combined.map((p) => (
-                        <tr key={p.key} className="border-b border-slate-100 last:border-0">
+                        <tr key={p.key} className="h-11 border-b border-slate-100 last:border-0">
                           {doneEntries.map((entry) => (
-                            <td key={entry.id} className="py-2.5 pl-3 pr-3 text-slate-700">
+                            <td key={entry.id} className="pl-3 pr-3 text-slate-700">
                               {entry.id in p.perReceipt ? (
                                 formatCurrency(p.perReceipt[entry.id])
                               ) : (
@@ -282,7 +317,7 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
                               )}
                             </td>
                           ))}
-                          <td className="py-2.5 pl-3 pr-3 font-semibold text-slate-900">{formatCurrency(p.total)}</td>
+                          <td className="pl-3 pr-3 font-semibold text-slate-900">{formatCurrency(p.total)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -307,33 +342,89 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
                 )}
                 <div className="mt-3 space-y-1.5">
                   {balances.map((b) => (
-                    <div key={b.key} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                      <PersonTag name={b.name} colorIndex={b.colorIndex} size="sm" />
-                      <span className="text-xs text-slate-400">
+                    <div key={b.key} className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <PersonTag name={b.name} colorIndex={b.colorIndex} size="sm" />
+                        <span
+                          className={`font-semibold ${
+                            b.net > EPSILON ? 'text-emerald-600' : b.net < -EPSILON ? 'text-red-600' : 'text-slate-400'
+                          }`}
+                        >
+                          {b.net > EPSILON
+                            ? `is owed ${formatCurrency(b.net)}`
+                            : b.net < -EPSILON
+                              ? `owes ${formatCurrency(-b.net)}`
+                              : 'settled up'}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-400">
                         paid {formatCurrency(b.paid)} · owes {formatCurrency(b.owed)}
-                      </span>
-                      <span className={`font-semibold ${b.net > EPSILON ? 'text-emerald-600' : b.net < -EPSILON ? 'text-red-600' : 'text-slate-400'}`}>
-                        {b.net > EPSILON ? `is owed ${formatCurrency(b.net)}` : b.net < -EPSILON ? `owes ${formatCurrency(-b.net)}` : 'settled up'}
-                      </span>
+                      </p>
                     </div>
                   ))}
                 </div>
 
-                <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Suggested settlements
-                </h4>
-                {settlements.length > 0 ? (
-                  <ul className="mt-2 space-y-1.5">
-                    {settlements.map((s, idx) => (
-                      <li key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                        <span className="text-slate-700">
-                          <span className="font-medium">{s.fromName}</span> pays{' '}
-                          <span className="font-medium">{s.toName}</span>
-                        </span>
-                        <span className="font-semibold text-slate-900">{formatCurrency(s.amount)}</span>
-                      </li>
+                <div className="mt-4 flex items-center justify-between">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Suggested settlements
+                  </h4>
+                  {settlements.length > 0 && (
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="text-slate-400">Group by</span>
+                      <button
+                        type="button"
+                        onClick={() => setSettleGroupBy('payer')}
+                        className={`rounded-full border px-2 py-0.5 font-medium transition ${
+                          settleGroupBy === 'payer'
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
+                        }`}
+                      >
+                        Who pays
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSettleGroupBy('payee')}
+                        className={`rounded-full border px-2 py-0.5 font-medium transition ${
+                          settleGroupBy === 'payee'
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
+                        }`}
+                      >
+                        Who&rsquo;s owed
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {groupedSettlements.length > 0 ? (
+                  <div className="mt-2 space-y-3">
+                    {groupedSettlements.map(([name, items]) => (
+                      <div key={name}>
+                        <p className="text-xs font-semibold text-slate-600">{name}</p>
+                        <ul className="mt-1 space-y-1.5">
+                          {items.map((s, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                            >
+                              <span className="text-slate-700">
+                                {settleGroupBy === 'payer' ? (
+                                  <>
+                                    pays <span className="font-medium">{s.toName}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="font-medium">{s.fromName}</span> pays
+                                  </>
+                                )}
+                              </span>
+                              <span className="font-semibold text-slate-900">{formatCurrency(s.amount)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 ) : (
                   <p className="mt-2 text-sm text-slate-400">Everyone&rsquo;s settled up.</p>
                 )}

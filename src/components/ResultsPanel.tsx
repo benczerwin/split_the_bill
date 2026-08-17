@@ -21,14 +21,14 @@ export default function ResultsPanel({ summary, tax, paid, onTogglePaid }: Resul
         {/* Frozen name column — a separate table outside the scroll area, so it can never move or grow a scrollbar of its own. */}
         <table className="shrink-0 border-collapse text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-              <th className="border-r border-slate-200 py-2 pr-6 font-medium">Person</th>
+            <tr className="h-9 border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+              <th className="border-r border-slate-200 pr-6 font-medium">Person</th>
             </tr>
           </thead>
           <tbody>
             {results.map((r) => (
-              <tr key={r.person.id} className="border-b border-slate-100 last:border-0">
-                <td className="border-r border-slate-200 py-2.5 pr-6">
+              <tr key={r.person.id} className="h-11 border-b border-slate-100 last:border-0">
+                <td className="border-r border-slate-200 pr-6">
                   <PersonTag name={r.person.name} colorIndex={r.person.colorIndex} size="sm" />
                 </td>
               </tr>
@@ -44,22 +44,22 @@ export default function ResultsPanel({ summary, tax, paid, onTogglePaid }: Resul
         <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
           <table className="w-full min-w-[420px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-                <th className="py-2 pl-3 pr-3 font-medium">% of meal</th>
-                <th className="py-2 pr-3 font-medium">Items</th>
-                <th className="py-2 pr-3 font-medium">+ Tax &amp; tip</th>
-                <th className="py-2 pr-3 font-medium">With cash back</th>
-                <th className="py-2 pr-3 text-center font-medium">Paid</th>
+              <tr className="h-9 border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                <th className="pl-3 pr-3 font-medium">% of meal</th>
+                <th className="pr-3 font-medium">Items</th>
+                <th className="pr-3 font-medium">+ Tax &amp; tip</th>
+                <th className="pr-3 font-medium">With cash back</th>
+                <th className="pr-3 text-center font-medium">Paid</th>
               </tr>
             </thead>
             <tbody>
               {results.map((r) => (
-                <tr key={r.person.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2.5 pl-3 pr-3 text-slate-500">{Math.round(r.shareFraction * 100)}%</td>
-                  <td className="py-2.5 pr-3 text-slate-700">{formatCurrency(r.itemCost)}</td>
-                  <td className="py-2.5 pr-3 font-medium text-slate-900">{formatCurrency(r.costWithTaxTip)}</td>
-                  <td className="py-2.5 pr-3 font-medium text-emerald-600">{formatCurrency(r.costWithCashBack)}</td>
-                  <td className="py-2.5 pr-3 text-center">
+                <tr key={r.person.id} className="h-11 border-b border-slate-100 last:border-0">
+                  <td className="pl-3 pr-3 text-slate-500">{Math.round(r.shareFraction * 100)}%</td>
+                  <td className="pr-3 text-slate-700">{formatCurrency(r.itemCost)}</td>
+                  <td className="pr-3 font-medium text-slate-900">{formatCurrency(r.costWithTaxTip)}</td>
+                  <td className="pr-3 font-medium text-emerald-600">{formatCurrency(r.costWithCashBack)}</td>
+                  <td className="pr-3 text-center">
                     <input
                       type="checkbox"
                       checked={!!paid[r.person.id]}

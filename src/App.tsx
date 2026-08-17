@@ -11,6 +11,7 @@ import SettingsModal from './components/SettingsModal'
 import ReceiptScanModal from './components/ReceiptScanModal'
 import CombineReceiptsModal from './components/CombineReceiptsModal'
 import HeaderMenu from './components/HeaderMenu'
+import { APP_VERSION } from './version'
 
 function uid(): string {
   return crypto.randomUUID()
@@ -216,6 +217,8 @@ export default function App() {
         />
         <ResultsPanel summary={summary} tax={state.tax} paid={state.paid} onTogglePaid={togglePaid} />
       </main>
+
+      <p className="mt-8 text-center text-xs text-slate-300">v{APP_VERSION}</p>
 
       {showSettings && (
         <SettingsModal
