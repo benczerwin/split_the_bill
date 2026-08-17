@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { computeSplit, formatCurrency } from '../lib/calculations'
+import { useBodyScrollLock } from '../lib/useBodyScrollLock'
 import PersonTag from './PersonTag'
 import ReceiptSection, { type ReceiptEntry } from './ReceiptSection'
 
@@ -135,6 +136,7 @@ interface CombineReceiptsModalProps {
 }
 
 export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalProps) {
+  useBodyScrollLock()
   const [entries, setEntries] = useState<ReceiptEntry[]>([])
   const [useCashBack, setUseCashBack] = useState(false)
   const [settleGroupBy, setSettleGroupBy] = useState<SettleGroupBy>('payer')
@@ -364,20 +366,18 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
                   ))}
                 </div>
 
-                <div className="mt-4 flex items-center justify-between">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Suggested settlements
-                  </h4>
-                  {settlements.length > 0 && (
-                    <div className="flex items-center gap-1 text-xs">
-                      <span className="text-slate-400">Group by</span>
+                <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Suggested settlements
+                </h4>
+                {settlements.length > 0 && (
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-400">Group by</span>
+                    <div className="inline-flex rounded-full border border-slate-200 bg-slate-100 p-0.5 text-xs">
                       <button
                         type="button"
                         onClick={() => setSettleGroupBy('payer')}
-                        className={`rounded-full border px-2 py-0.5 font-medium transition ${
-                          settleGroupBy === 'payer'
-                            ? 'border-slate-900 bg-slate-900 text-white'
-                            : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
+                        className={`rounded-full px-3 py-1 font-medium transition ${
+                          settleGroupBy === 'payer' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
                         }`}
                       >
                         Who pays
@@ -385,17 +385,15 @@ export default function CombineReceiptsModal({ onClose }: CombineReceiptsModalPr
                       <button
                         type="button"
                         onClick={() => setSettleGroupBy('payee')}
-                        className={`rounded-full border px-2 py-0.5 font-medium transition ${
-                          settleGroupBy === 'payee'
-                            ? 'border-slate-900 bg-slate-900 text-white'
-                            : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
+                        className={`rounded-full px-3 py-1 font-medium transition ${
+                          settleGroupBy === 'payee' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
                         }`}
                       >
                         Who&rsquo;s owed
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
                 {groupedSettlements.length > 0 ? (
                   <div className="mt-2 space-y-3">
                     {groupedSettlements.map(([name, items]) => (
