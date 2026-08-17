@@ -18,53 +18,61 @@ export interface ReceiptEntry {
 
 interface ReceiptSectionProps {
   entry: ReceiptEntry
+  /** Maps a lowercased, trimmed person name to one shared colorIndex, so the same person
+   *  looks the same everywhere in Combine Receipts even though each bill assigned its own
+   *  colors independently when it was created. */
+  nameColorMap: Map<string, number>
   onRemove: () => void
   onToggleExpanded: () => void
   onSetPayer: (personId: string | null) => void
 }
 
-export default function ReceiptSection({ entry, onRemove, onToggleExpanded, onSetPayer }: ReceiptSectionProps) {
+export default function ReceiptSection({ entry, nameColorMap, onRemove, onToggleExpanded, onSetPayer }: ReceiptSectionProps) {
   const label = entry.status === 'done' && entry.bill ? entry.bill.title || entry.fileName : entry.fileName
   const canExpand = entry.status === 'done'
 
+  function colorIndexFor(name: string, fallback: number): number {
+    return nameColorMap.get(name.trim().toLowerCase()) ?? fallback
+  }
+
   return (
     <div className={`rounded-xl border ${entry.status === 'error' ? 'border-red-200' : 'border-slate-200'}`}>
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <button
-          type="button"
-          onClick={onToggleExpanded}
-          disabled={!canExpand}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
-        >
-          {entry.status === 'loading' && (
-            <span className="block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+      <div className="px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            disabled={!canExpand}
+            className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
+          >
+            {entry.status === 'loading' && (
+              <span className="block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            )}
+            {canExpand && (
+              <ChevronDownIcon
+                className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${entry.expanded ? '' : '-rotate-90'}`}
+              />
+            )}
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{label}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${label}`}
+            className="shrink-0 rounded-full px-1.5 text-slate-400 hover:text-red-500"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6 text-xs text-slate-400">
+          {entry.bill?.date && <span>{entry.bill.date}</span>}
+          {entry.status === 'done' && entry.summary && (
+            <span className="font-medium text-slate-600">{formatCurrency(entry.summary.totalWithTaxTip)}</span>
           )}
-          {canExpand && (
-            <ChevronDownIcon
-              className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${entry.expanded ? '' : '-rotate-90'}`}
-            />
+          {entry.status === 'done' && !entry.payerId && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">No payer</span>
           )}
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{label}</span>
-          {entry.bill?.date && <span className="shrink-0 text-xs text-slate-400">{entry.bill.date}</span>}
-        </button>
-        {entry.status === 'done' && entry.summary && (
-          <span className="shrink-0 text-sm font-semibold text-slate-700">
-            {formatCurrency(entry.summary.totalWithTaxTip)}
-          </span>
-        )}
-        {entry.status === 'done' && !entry.payerId && (
-          <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">
-            No payer
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`Remove ${label}`}
-          className="shrink-0 rounded-full px-1.5 text-slate-400 hover:text-red-500"
-        >
-          &times;
-        </button>
+        </div>
       </div>
 
       {entry.status === 'error' && (
@@ -78,7 +86,7 @@ export default function ReceiptSection({ entry, onRemove, onToggleExpanded, onSe
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {entry.bill.people.map((person) => {
                 const active = entry.payerId === person.id
-                const swatch = colorForIndex(person.colorIndex)
+                const swatch = colorForIndex(colorIndexFor(person.name, person.colorIndex))
                 return (
                   <button
                     key={person.id}
@@ -137,22 +145,24 @@ export default function ReceiptSection({ entry, onRemove, onToggleExpanded, onSe
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[360px] border-collapse text-xs">
+            <table className="w-full min-w-[240px] border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-left uppercase tracking-wide text-slate-400">
                   <th className="py-1.5 pr-3 font-medium">Person</th>
                   <th className="py-1.5 pr-3 font-medium">Owes</th>
-                  <th className="py-1.5 pr-3 font-medium">With cash back</th>
                 </tr>
               </thead>
               <tbody>
                 {entry.summary.results.map((r) => (
                   <tr key={r.person.id} className="border-b border-slate-100 last:border-0">
                     <td className="py-1.5 pr-3">
-                      <PersonTag name={r.person.name} colorIndex={r.person.colorIndex} size="sm" />
+                      <PersonTag
+                        name={r.person.name}
+                        colorIndex={colorIndexFor(r.person.name, r.person.colorIndex)}
+                        size="sm"
+                      />
                     </td>
                     <td className="py-1.5 pr-3 font-medium text-slate-900">{formatCurrency(r.costWithTaxTip)}</td>
-                    <td className="py-1.5 pr-3 font-medium text-emerald-600">{formatCurrency(r.costWithCashBack)}</td>
                   </tr>
                 ))}
               </tbody>
