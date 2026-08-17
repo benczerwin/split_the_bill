@@ -9,6 +9,7 @@ import { CameraIcon } from './icons'
 
 interface ReceiptScanModalProps {
   apiKey: string
+  currency: string
   onClose: () => void
   onOpenSettings: () => void
   onApply: (result: {
@@ -43,7 +44,7 @@ function normalizePastedText(raw: string): string {
   }
 }
 
-export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onApply }: ReceiptScanModalProps) {
+export default function ReceiptScanModal({ apiKey, currency, onClose, onOpenSettings, onApply }: ReceiptScanModalProps) {
   useBodyScrollLock()
   const [engine, setEngine] = useState<Engine>(apiKey ? 'claude' : 'paste')
   const [status, setStatus] = useState<Status>('idle')
@@ -300,7 +301,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                   onChange={(e) => setApplyTax(e.target.checked)}
                   className="h-4 w-4 rounded border-slate-300"
                 />
-                Tax: {taxValue !== null ? formatCurrency(taxValue) : 'not found'}
+                Tax: {taxValue !== null ? formatCurrency(taxValue, currency) : 'not found'}
               </label>
               <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
                 <input
@@ -310,7 +311,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
                   onChange={(e) => setApplyTip(e.target.checked)}
                   className="h-4 w-4 rounded border-slate-300"
                 />
-                Tip: {tipValue !== null ? formatCurrency(tipValue) : 'not found'}
+                Tip: {tipValue !== null ? formatCurrency(tipValue, currency) : 'not found'}
               </label>
               <label className="col-span-2 flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
                 <input
@@ -324,7 +325,7 @@ export default function ReceiptScanModal({ apiKey, onClose, onOpenSettings, onAp
               </label>
             </div>
             {receipt?.total !== null && receipt?.total !== undefined && (
-              <p className="mt-2 text-xs text-slate-400">Receipt total (for reference): {formatCurrency(receipt.total)}</p>
+              <p className="mt-2 text-xs text-slate-400">Receipt total (for reference): {formatCurrency(receipt.total, currency)}</p>
             )}
 
             <div className="mt-5 flex justify-end gap-2">

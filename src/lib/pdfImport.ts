@@ -88,6 +88,7 @@ export interface ImportedCombineSession {
   payerIndices: (number | null)[]
   cashBackPercent: number
   settleGroupBy: 'payer' | 'payee'
+  currencyOverride: string | null
 }
 
 export async function importCombinedFromPDF(file: File): Promise<ImportedCombineSession> {
@@ -118,5 +119,6 @@ export async function importCombinedFromPDF(file: File): Promise<ImportedCombine
     payerIndices: meta.p,
     cashBackPercent: meta.cb,
     settleGroupBy: meta.gb === 1 ? 'payee' : 'payer',
+    currencyOverride: meta.cc ?? null,
   }
 }

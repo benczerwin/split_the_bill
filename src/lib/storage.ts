@@ -9,11 +9,23 @@ const LIBRARY_KEY = 'split-the-bill:receipt-library:v1'
 
 export const LIBRARY_LIMIT = 30
 
+/** Backfills currency fields on bills saved before v4.0 — old JSON simply lacks these keys, so
+ *  spreading defaults first (then the loaded bill on top) leaves any already-present values
+ *  untouched while filling in the gaps. */
+function normalizeBill(bill: BillState): BillState {
+  return {
+    ...bill,
+    currency: bill.currency ?? 'USD',
+    chargedCurrency: bill.chargedCurrency ?? null,
+    chargedTotal: bill.chargedTotal ?? null,
+  }
+}
+
 export function loadBillState(): BillState | null {
   try {
     const raw = localStorage.getItem(BILL_KEY)
     if (!raw) return null
-    return JSON.parse(raw) as BillState
+    return normalizeBill(JSON.parse(raw) as BillState)
   } catch {
     return null
   }
@@ -72,6 +84,7 @@ interface StoredCombineState {
   receipts: StoredCombineReceipt[]
   cashBackPercent: number
   settleGroupBy: 'payer' | 'payee'
+  currencyOverride?: string | null
 }
 
 export function loadCombineState(): CombineState | null {
@@ -80,18 +93,22 @@ export function loadCombineState(): CombineState | null {
     if (!raw) return null
     const stored = JSON.parse(raw) as StoredCombineState
     return {
-      receipts: stored.receipts.map((r) => ({
-        id: r.id,
-        fileName: r.fileName,
-        status: 'done',
-        bill: r.bill,
-        summary: computeSplit(r.bill),
-        payerId: r.payerId,
-        expanded: false,
-        libraryId: r.libraryId,
-      })),
+      receipts: stored.receipts.map((r) => {
+        const bill = normalizeBill(r.bill)
+        return {
+          id: r.id,
+          fileName: r.fileName,
+          status: 'done',
+          bill,
+          summary: computeSplit(bill),
+          payerId: r.payerId,
+          expanded: false,
+          libraryId: r.libraryId,
+        }
+      }),
       cashBackPercent: stored.cashBackPercent ?? 0,
       settleGroupBy: stored.settleGroupBy === 'payee' ? 'payee' : 'payer',
+      currencyOverride: stored.currencyOverride ?? null,
     }
   } catch {
     return null
@@ -106,6 +123,7 @@ export function saveCombineState(state: CombineState): void {
         .map((r) => ({ id: r.id, fileName: r.fileName, bill: r.bill!, payerId: r.payerId, libraryId: r.libraryId })),
       cashBackPercent: state.cashBackPercent,
       settleGroupBy: state.settleGroupBy,
+      currencyOverride: state.currencyOverride,
     }
     localStorage.setItem(COMBINE_KEY, JSON.stringify(stored))
   } catch {
@@ -118,7 +136,7 @@ export function loadReceiptLibrary(): SavedReceipt[] {
     const raw = localStorage.getItem(LIBRARY_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw) as SavedReceipt[]
-    return Array.isArray(parsed) ? parsed : []
+    return Array.isArray(parsed) ? parsed.map((item) => ({ ...item, bill: normalizeBill(item.bill) })) : []
   } catch {
     return []
   }

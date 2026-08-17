@@ -37,7 +37,30 @@ export function computeSplit(state: BillState): SplitSummary {
   return { subtotal, tipAmount, totalWithTaxTip, results, unassignedItems, isBalanced }
 }
 
-export function formatCurrency(value: number): string {
-  if (!Number.isFinite(value)) return '$0.00'
-  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+export function formatCurrency(value: number, currency: string = 'USD'): string {
+  const safeValue = Number.isFinite(value) ? value : 0
+  try {
+    return safeValue.toLocaleString('en-US', { style: 'currency', currency })
+  } catch {
+    return `${currency} ${safeValue.toFixed(2)}`
+  }
+}
+
+/** Multiplies every money field in a summary by a scale factor — used to re-express a bill's
+ *  split in a different currency (e.g. the amount your card was actually charged) without
+ *  redoing the underlying item-split math. */
+export function scaleSummary(summary: SplitSummary, scale: number): SplitSummary {
+  if (scale === 1) return summary
+  return {
+    ...summary,
+    subtotal: summary.subtotal * scale,
+    tipAmount: summary.tipAmount * scale,
+    totalWithTaxTip: summary.totalWithTaxTip * scale,
+    results: summary.results.map((r) => ({
+      ...r,
+      itemCost: r.itemCost * scale,
+      costWithTaxTip: r.costWithTaxTip * scale,
+      costWithCashBack: r.costWithCashBack * scale,
+    })),
+  }
 }
