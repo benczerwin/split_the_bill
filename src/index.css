@@ -7,7 +7,7 @@ html {
 }
 
 body {
-  @apply bg-slate-100 text-slate-900 antialiased;
+  @apply bg-slate-100 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
 }
 
 /* iOS Safari zooms the page in on focus when a text/number input renders below
@@ -33,4 +33,17 @@ textarea {
 
 .flash-fade {
   animation: flash-fade 2.2s ease-out;
+}
+
+.dark .flash-fade {
+  animation-name: flash-fade-dark;
+}
+
+@keyframes flash-fade-dark {
+  0% {
+    background-color: #064e3b;
+  }
+  100% {
+    background-color: transparent;
+  }
 }

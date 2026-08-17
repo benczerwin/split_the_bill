@@ -1,4 +1,4 @@
-import type { AppMode, BillState, CombineState, SavedReceipt } from '../types'
+import type { AppMode, BillState, CombineState, SavedReceipt, Theme } from '../types'
 import { computeSplit } from './calculations'
 
 const BILL_KEY = 'split-the-bill:state:v1'
@@ -6,6 +6,7 @@ const API_KEY_KEY = 'split-the-bill:anthropic-api-key:v1'
 const MODE_KEY = 'split-the-bill:mode:v1'
 const COMBINE_KEY = 'split-the-bill:combine-state:v1'
 const LIBRARY_KEY = 'split-the-bill:receipt-library:v1'
+const THEME_KEY = 'split-the-bill:theme:v1'
 
 export const LIBRARY_LIMIT = 30
 
@@ -51,6 +52,23 @@ export function saveApiKey(key: string): void {
   try {
     if (key) localStorage.setItem(API_KEY_KEY, key)
     else localStorage.removeItem(API_KEY_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+export function loadTheme(): Theme {
+  try {
+    const raw = localStorage.getItem(THEME_KEY)
+    return raw === 'light' || raw === 'dark' ? raw : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+export function saveTheme(theme: Theme): void {
+  try {
+    localStorage.setItem(THEME_KEY, theme)
   } catch {
     // ignore
   }

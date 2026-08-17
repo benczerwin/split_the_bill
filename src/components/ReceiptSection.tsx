@@ -52,7 +52,7 @@ export default function ReceiptSection({
 
   return (
     <div
-      className={`rounded-xl border ${entry.status === 'error' ? 'border-red-200' : 'border-slate-200'} ${playFlash ? 'flash-fade' : ''}`}
+      className={`rounded-xl border ${entry.status === 'error' ? 'border-red-200 dark:border-red-900' : 'border-slate-200 dark:border-slate-700'} ${playFlash ? 'flash-fade' : ''}`}
       onAnimationEnd={() => setPlayFlash(false)}
     >
       <div className="px-3 py-2.5">
@@ -64,21 +64,21 @@ export default function ReceiptSection({
             className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
           >
             {entry.status === 'loading' && (
-              <span className="block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              <span className="block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 dark:border-slate-600 dark:border-t-slate-300" />
             )}
             {canExpand && (
               <ChevronDownIcon
-                className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${entry.expanded ? '' : '-rotate-90'}`}
+                className={`h-4 w-4 shrink-0 text-slate-400 transition-transform dark:text-slate-500 ${entry.expanded ? '' : '-rotate-90'}`}
               />
             )}
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{label}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{label}</span>
           </button>
           {canExpand && (
             <button
               type="button"
               onClick={onEdit}
               aria-label={`Edit ${label}`}
-              className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
             >
               <PencilIcon className="h-4 w-4" />
             </button>
@@ -87,35 +87,35 @@ export default function ReceiptSection({
             type="button"
             onClick={onRemove}
             aria-label={`Remove ${label}`}
-            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500"
+            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-red-400"
           >
             &times;
           </button>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6 text-xs text-slate-400">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6 text-xs text-slate-400 dark:text-slate-500">
           {entry.bill?.date && <span>{entry.bill.date}</span>}
           {display && (
-            <span className="font-medium text-slate-600">{formatCurrency(display.summary.totalWithTaxTip, display.currency)}</span>
+            <span className="font-medium text-slate-600 dark:text-slate-300">{formatCurrency(display.summary.totalWithTaxTip, display.currency)}</span>
           )}
           {display && entry.bill && display.currency !== entry.bill.currency && (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               charged in {display.currency}
             </span>
           )}
           {entry.status === 'done' && !entry.payerId && (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600">No payer</span>
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:bg-amber-950 dark:text-amber-400">No payer</span>
           )}
         </div>
       </div>
 
       {entry.status === 'error' && (
-        <p className="border-t border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">{entry.error}</p>
+        <p className="border-t border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">{entry.error}</p>
       )}
 
       {canExpand && entry.expanded && entry.bill && entry.summary && (
-        <div className="space-y-4 border-t border-slate-100 px-3 py-3">
+        <div className="space-y-4 border-t border-slate-100 px-3 py-3 dark:border-slate-800">
           <div>
-            <p className="text-xs font-medium text-slate-500">Who paid this bill?</p>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Who paid this bill?</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {entry.bill.people.map((person) => {
                 const active = entry.payerId === person.id
@@ -137,7 +137,7 @@ export default function ReceiptSection({
                 )
               })}
               {entry.bill.people.length === 0 && (
-                <span className="text-xs text-slate-400">No people on this receipt.</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500">No people on this receipt.</span>
               )}
             </div>
           </div>
@@ -145,7 +145,7 @@ export default function ReceiptSection({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[360px] border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 text-left uppercase tracking-wide text-slate-400">
+                <tr className="border-b border-slate-200 text-left uppercase tracking-wide text-slate-400 dark:border-slate-700 dark:text-slate-500">
                   <th className="py-1.5 pr-3 font-medium">Item</th>
                   <th className="py-1.5 pr-3 font-medium">Price</th>
                   <th className="py-1.5 pr-3 font-medium">Who</th>
@@ -153,10 +153,10 @@ export default function ReceiptSection({
               </thead>
               <tbody>
                 {entry.bill.items.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                    <td className="py-1.5 pr-3 text-slate-700">{item.name || 'Untitled item'}</td>
-                    <td className="py-1.5 pr-3 text-slate-700">{formatCurrency(item.price, entry.bill?.currency)}</td>
-                    <td className="py-1.5 pr-3 text-slate-500">
+                  <tr key={item.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                    <td className="py-1.5 pr-3 text-slate-700 dark:text-slate-300">{item.name || 'Untitled item'}</td>
+                    <td className="py-1.5 pr-3 text-slate-700 dark:text-slate-300">{formatCurrency(item.price, entry.bill?.currency)}</td>
+                    <td className="py-1.5 pr-3 text-slate-500 dark:text-slate-400">
                       {item.assignedTo.length === 0
                         ? 'Everyone'
                         : item.assignedTo
@@ -168,7 +168,7 @@ export default function ReceiptSection({
                 ))}
                 {entry.bill.items.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="py-2 text-center text-slate-400">
+                    <td colSpan={3} className="py-2 text-center text-slate-400 dark:text-slate-500">
                       No items.
                     </td>
                   </tr>
@@ -180,14 +180,14 @@ export default function ReceiptSection({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[240px] border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 text-left uppercase tracking-wide text-slate-400">
+                <tr className="border-b border-slate-200 text-left uppercase tracking-wide text-slate-400 dark:border-slate-700 dark:text-slate-500">
                   <th className="py-1.5 pr-3 font-medium">Person</th>
                   <th className="py-1.5 pr-3 font-medium">Owes</th>
                 </tr>
               </thead>
               <tbody>
                 {(display?.summary.results ?? entry.summary.results).map((r) => (
-                  <tr key={r.person.id} className="border-b border-slate-100 last:border-0">
+                  <tr key={r.person.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
                     <td className="py-1.5 pr-3">
                       <PersonTag
                         name={r.person.name}
@@ -195,7 +195,7 @@ export default function ReceiptSection({
                         size="sm"
                       />
                     </td>
-                    <td className="py-1.5 pr-3 font-medium text-slate-900">
+                    <td className="py-1.5 pr-3 font-medium text-slate-900 dark:text-white">
                       {formatCurrency(r.costWithTaxTip, display?.currency)}
                     </td>
                   </tr>

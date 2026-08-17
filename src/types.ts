@@ -58,6 +58,8 @@ export interface SplitSummary {
 
 export type AppMode = 'single' | 'combine'
 
+export type Theme = 'light' | 'dark' | 'system'
+
 export interface CombineReceiptEntry {
   id: string
   fileName: string

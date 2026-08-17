@@ -3,6 +3,7 @@ import type { AppMode, BillState, CombineReceiptEntry, CombineState, Item, Settl
 import { computeSplit } from './lib/calculations'
 import { computeBillDisplay, convertAmount, getCurrencySymbol } from './lib/currency'
 import { useExchangeRates } from './hooks/useExchangeRates'
+import { useTheme } from './hooks/useTheme'
 import {
   addToReceiptLibrary,
   LIBRARY_LIMIT,
@@ -99,6 +100,7 @@ export default function App() {
   const [combineState, setCombineState] = useState<CombineState>(() => loadCombineState() ?? makeDefaultCombineState())
   const [library, setLibrary] = useState(() => loadReceiptLibrary())
   const [apiKey, setApiKey] = useState(() => loadApiKey())
+  const { theme, setTheme } = useTheme()
   const [showSettings, setShowSettings] = useState(false)
   const [showScan, setShowScan] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -299,6 +301,7 @@ export default function App() {
     switchMode('single')
     setState(makeDefaultState())
     setAddingForCombine(true)
+    window.scrollTo({ top: 0 })
   }
 
   function handleLoadExample() {
@@ -499,12 +502,12 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 pb-16">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-slate-100 pb-16 dark:bg-slate-950">
+      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
           <div>
-            <h1 className="text-lg font-bold text-slate-900">Split the Bill</h1>
-            <p className="text-xs text-slate-400">Split a bill fairly, alone or combined across receipts.</p>
+            <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Split the Bill</h1>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Split a bill fairly, alone or combined across receipts.</p>
           </div>
           <HeaderMenu
             mode={mode}
@@ -519,12 +522,14 @@ export default function App() {
       </header>
 
       <div className="mx-auto mt-4 flex max-w-3xl items-stretch gap-2 px-4">
-        <div className="grid flex-1 grid-cols-2 gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
+        <div className="grid flex-1 grid-cols-2 gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
           <button
             type="button"
             onClick={() => switchMode('single')}
             className={`rounded-xl py-2 text-sm font-semibold transition ${
-              mode === 'single' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'
+              mode === 'single'
+                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
             }`}
           >
             Single bill
@@ -533,7 +538,9 @@ export default function App() {
             type="button"
             onClick={() => switchMode('combine')}
             className={`rounded-xl py-2 text-sm font-semibold transition ${
-              mode === 'combine' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'
+              mode === 'combine'
+                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
             }`}
           >
             Combine receipts
@@ -544,7 +551,7 @@ export default function App() {
           onClick={handleClearAll}
           aria-label={mode === 'single' ? 'Clear bill' : 'Clear combine session'}
           title={mode === 'single' ? 'Clear bill' : 'Clear combine session'}
-          className="shrink-0 rounded-2xl bg-white px-3 text-slate-400 shadow-sm ring-1 ring-slate-200 hover:text-red-500"
+          className="shrink-0 rounded-2xl bg-white px-3 text-slate-400 shadow-sm ring-1 ring-slate-200 hover:text-red-500 dark:bg-slate-900 dark:ring-slate-700 dark:text-slate-500 dark:hover:text-red-400"
         >
           <TrashIcon className="h-5 w-5" />
         </button>
@@ -555,8 +562,8 @@ export default function App() {
           <div
             className={`flex max-w-lg items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm shadow-lg ring-1 ${
               importNotice.kind === 'success'
-                ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
-                : 'bg-red-50 text-red-700 ring-red-100'
+                ? 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 dark:ring-emerald-900'
+                : 'bg-red-50 text-red-700 ring-red-100 dark:bg-red-950 dark:text-red-300 dark:ring-red-900'
             }`}
           >
             <span>{importNotice.message}</span>
@@ -571,7 +578,7 @@ export default function App() {
         {mode === 'single' ? (
           <>
             {(addingForCombine || editTarget) && (
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-50 px-4 py-2.5 text-sm text-indigo-700">
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-50 px-4 py-2.5 text-sm text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
                 <span>
                   {addingForCombine
                     ? 'Building a new bill for your combine session — saving it below will add it there automatically.'
@@ -597,7 +604,7 @@ export default function App() {
                   onFocus={() => setTitleFocused(true)}
                   onBlur={() => setTitleFocused(false)}
                   placeholder="Untitled bill"
-                  className="w-full rounded-xl border border-transparent bg-transparent py-1 pl-1 pr-7 text-xl font-semibold text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:py-2 focus:pl-3 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                  className="w-full rounded-xl border border-transparent bg-transparent py-1 pl-1 pr-7 text-xl font-semibold text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:py-2 focus:pl-3 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-600 dark:focus:bg-slate-900 dark:focus:ring-slate-600"
                 />
                 {titleFocused && state.title && (
                   <button
@@ -605,7 +612,7 @@ export default function App() {
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setState((prev) => ({ ...prev, title: '' }))}
                     aria-label="Clear title"
-                    className="absolute inset-y-0 right-1 flex items-center px-1 text-slate-300 hover:text-slate-500"
+                    className="absolute inset-y-0 right-1 flex items-center px-1 text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400"
                   >
                     &times;
                   </button>
@@ -615,7 +622,7 @@ export default function App() {
                 type="date"
                 value={state.date}
                 onChange={(e) => setState((prev) => ({ ...prev, date: e.target.value }))}
-                className="shrink-0 rounded-xl border border-transparent bg-transparent px-1 py-1 text-sm text-slate-500 focus:border-slate-300 focus:bg-white focus:px-3 focus:py-2 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                className="shrink-0 rounded-xl border border-transparent bg-transparent px-1 py-1 text-sm text-slate-500 focus:border-slate-300 focus:bg-white focus:px-3 focus:py-2 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:text-slate-400 dark:focus:border-slate-600 dark:focus:bg-slate-900 dark:focus:ring-slate-600 dark:[color-scheme:dark]"
               />
             </div>
             <PeopleManager people={state.people} onAdd={addPerson} onRemove={removePerson} />
@@ -642,6 +649,7 @@ export default function App() {
             />
             <CurrencyPanel
               currency={state.currency}
+              billTotal={summary.totalWithTaxTip}
               chargedCurrency={state.chargedCurrency}
               chargedTotal={state.chargedTotal}
               onCurrencyChange={(currency) => setState((prev) => ({ ...prev, currency }))}
@@ -663,12 +671,12 @@ export default function App() {
               paid={state.paid}
               onTogglePaid={togglePaid}
             />
-            <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200">
+            <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
               <button
                 type="button"
                 onClick={handleSaveToLibrary}
                 disabled={state.people.length === 0 && state.items.length === 0}
-                className="w-full rounded-xl border border-slate-300 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                className="w-full rounded-xl border border-slate-300 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {editTarget?.kind === 'receipt'
                   ? 'Update receipt'
@@ -682,12 +690,12 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleSaveAsNewFromEdit}
-                  className="mt-2 text-xs text-slate-400 underline hover:text-slate-600"
+                  className="mt-2 text-xs text-slate-400 underline hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
                 >
                   Save as a new bill instead
                 </button>
               ) : (
-                <p className="mt-2 text-xs text-slate-400">
+                <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
                   Saved only in this browser on this device — not synced anywhere. Kept until you delete it or the{' '}
                   {LIBRARY_LIMIT} most recent bills fill up, whichever comes first. Add it into a Combine Receipts
                   session anytime from &ldquo;From your device.&rdquo;
@@ -717,15 +725,17 @@ export default function App() {
         )}
       </main>
 
-      <p className="mt-8 text-center text-xs text-slate-300">v{APP_VERSION}</p>
+      <p className="mt-8 text-center text-xs text-slate-300 dark:text-slate-700">v{APP_VERSION}</p>
 
       {showSettings && (
         <SettingsModal
           apiKey={apiKey}
+          theme={theme}
           onSave={(key) => {
             setApiKey(key)
             saveApiKey(key)
           }}
+          onThemeChange={setTheme}
           onClose={() => setShowSettings(false)}
         />
       )}
