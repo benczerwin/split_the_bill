@@ -24,8 +24,11 @@ import SettingsModal from './components/SettingsModal'
 import ReceiptScanModal from './components/ReceiptScanModal'
 import CombinePage from './components/CombinePage'
 import HeaderMenu from './components/HeaderMenu'
+import PayerPicker from './components/PayerPicker'
 import { TrashIcon } from './components/icons'
 import { APP_VERSION } from './version'
+
+type EditTarget = { kind: 'library'; libraryId: string } | { kind: 'receipt'; receiptId: string }
 
 function uid(): string {
   return crypto.randomUUID()
@@ -42,6 +45,7 @@ function makeDefaultState(): BillState {
     tipValue: 20,
     cashBackPercent: 4,
     paid: {},
+    payerId: null,
   }
 }
 
@@ -73,6 +77,7 @@ function makeExampleState(): BillState {
     tipValue: 20,
     cashBackPercent: 4,
     paid: {},
+    payerId: alex,
   }
 }
 
@@ -90,18 +95,27 @@ export default function App() {
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [importNotice, setImportNotice] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
-  // Set when editing a saved bill from the library (via Combine Receipts), so "Save to
-  // library" updates that entry in place instead of creating a new one.
-  const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null)
+  // Set when editing a saved library bill or a combine-session receipt directly (both reached
+  // from Combine Receipts), so "Save to library" updates that entry in place instead of
+  // creating a new one.
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
   // Set when building a fresh bill specifically to add into the combine session, so saving it
   // both records it and drops it straight into the combine list instead of just the library.
   const [addingForCombine, setAddingForCombine] = useState(false)
   const [titleFocused, setTitleFocused] = useState(false)
+  // Briefly highlights the receipt just added/updated when landing back on Combine Receipts.
+  const [highlightReceiptId, setHighlightReceiptId] = useState<string | null>(null)
 
   useEffect(() => saveMode(mode), [mode])
   useEffect(() => saveBillState(state), [state])
   useEffect(() => saveCombineState(combineState), [combineState])
   useEffect(() => saveReceiptLibrary(library), [library])
+
+  useEffect(() => {
+    if (!highlightReceiptId) return
+    const timer = setTimeout(() => setHighlightReceiptId(null), 2500)
+    return () => clearTimeout(timer)
+  }, [highlightReceiptId])
 
   const summary = computeSplit(state)
 
@@ -162,15 +176,45 @@ export default function App() {
   function switchMode(next: AppMode) {
     setMode(next)
     setImportNotice(null)
-    setEditingLibraryId(null)
+    setEditTarget(null)
     setAddingForCombine(false)
   }
 
   function handleSaveToLibrary() {
     if (state.people.length === 0 && state.items.length === 0) return
 
-    if (editingLibraryId) {
-      setLibrary((prev) => prev.map((item) => (item.id === editingLibraryId ? { ...item, bill: state } : item)))
+    if (editTarget?.kind === 'receipt') {
+      const updatedSummary = computeSplit(state)
+      const linkedLibraryId = combineState.receipts.find((r) => r.id === editTarget.receiptId)?.libraryId
+      setCombineState((prev) => ({
+        ...prev,
+        receipts: prev.receipts.map((r) =>
+          r.id === editTarget.receiptId
+            ? { ...r, bill: state, summary: updatedSummary, fileName: state.title || r.fileName }
+            : r,
+        ),
+      }))
+      if (linkedLibraryId) {
+        setLibrary((prev) => prev.map((item) => (item.id === linkedLibraryId ? { ...item, bill: state } : item)))
+      }
+      setHighlightReceiptId(editTarget.receiptId)
+      switchMode('combine')
+      setImportNotice({ kind: 'success', message: 'Updated the receipt in your combine session.' })
+      return
+    }
+
+    if (editTarget?.kind === 'library') {
+      const libraryId = editTarget.libraryId
+      setLibrary((prev) => prev.map((item) => (item.id === libraryId ? { ...item, bill: state } : item)))
+      setCombineState((prev) => ({
+        ...prev,
+        receipts: prev.receipts.map((r) =>
+          r.libraryId === libraryId
+            ? { ...r, bill: state, summary: computeSplit(state), fileName: state.title || r.fileName }
+            : r,
+        ),
+      }))
+      setEditTarget(null)
       setImportNotice({ kind: 'success', message: 'Updated the saved bill in your library.' })
       return
     }
@@ -186,12 +230,13 @@ export default function App() {
         status: 'done',
         bill: state,
         summary: computeSplit(state),
-        payerId: null,
-        expanded: true,
+        payerId: state.payerId ?? null,
+        expanded: false,
         libraryId: savedItem.id,
       }
       setCombineState((prev) => ({ ...prev, receipts: [...prev.receipts, newEntry] }))
       setAddingForCombine(false)
+      setHighlightReceiptId(newEntry.id)
       switchMode('combine')
       setImportNotice({ kind: 'success', message: 'Added to your combine session.' })
     } else {
@@ -205,7 +250,7 @@ export default function App() {
   function handleSaveAsNewFromEdit() {
     if (state.people.length === 0 && state.items.length === 0) return
     setLibrary((prev) => addToReceiptLibrary(prev, state))
-    setEditingLibraryId(null)
+    setEditTarget(null)
     setImportNotice({ kind: 'success', message: 'Saved as a new bill in your library.' })
   }
 
@@ -218,7 +263,19 @@ export default function App() {
     }
     switchMode('single')
     setState({ ...item.bill, date: toDateOnly(item.bill.date) })
-    setEditingLibraryId(id)
+    setEditTarget({ kind: 'library', libraryId: id })
+  }
+
+  function handleEditReceipt(id: string) {
+    const entry = combineState.receipts.find((r) => r.id === id)
+    if (!entry || !entry.bill) return
+    if (state.people.length > 0 || state.items.length > 0) {
+      const confirmed = window.confirm('Editing this receipt replaces your current single-bill draft. Continue?')
+      if (!confirmed) return
+    }
+    switchMode('single')
+    setState({ ...entry.bill, date: toDateOnly(entry.bill.date) })
+    setEditTarget({ kind: 'receipt', receiptId: id })
   }
 
   function handleStartNewBillForCombine() {
@@ -248,7 +305,7 @@ export default function App() {
         setLibrary((prev) => addToReceiptLibrary(prev, state))
       }
       setState(makeDefaultState())
-      setEditingLibraryId(null)
+      setEditTarget(null)
       setAddingForCombine(false)
     } else {
       if (combineState.receipts.length > 0 && !window.confirm('Clear all receipts from this combine session?')) return
@@ -334,7 +391,7 @@ export default function App() {
       fileName: file.name,
       status: 'loading',
       payerId: null,
-      expanded: true,
+      expanded: false,
     }))
     setCombineState((prev) => ({ ...prev, receipts: [...prev.receipts, ...newEntries] }))
 
@@ -348,7 +405,9 @@ export default function App() {
         const receiptSummary = computeSplit(bill)
         setCombineState((prev) => ({
           ...prev,
-          receipts: prev.receipts.map((e) => (e.id === entryId ? { ...e, status: 'done', bill, summary: receiptSummary } : e)),
+          receipts: prev.receipts.map((e) =>
+            e.id === entryId ? { ...e, status: 'done', bill, summary: receiptSummary, payerId: bill.payerId ?? null } : e,
+          ),
         }))
       } catch (err) {
         setCombineState((prev) => ({
@@ -374,8 +433,8 @@ export default function App() {
         status: 'done',
         bill: item.bill,
         summary: computeSplit(item.bill),
-        payerId: null,
-        expanded: true,
+        payerId: item.bill.payerId ?? null,
+        expanded: false,
         libraryId: item.id,
       }))
     setCombineState((prev) => ({ ...prev, receipts: [...prev.receipts, ...newEntries] }))
@@ -484,19 +543,18 @@ export default function App() {
       <main className="mx-auto mt-6 flex max-w-3xl flex-col gap-6 px-4">
         {mode === 'single' ? (
           <>
-            {(addingForCombine || editingLibraryId) && (
+            {(addingForCombine || editTarget) && (
               <div className="flex items-center justify-between gap-3 rounded-xl bg-indigo-50 px-4 py-2.5 text-sm text-indigo-700">
                 <span>
                   {addingForCombine
                     ? 'Building a new bill for your combine session — saving it below will add it there automatically.'
-                    : 'Editing a saved bill — saving it below updates that entry instead of creating a new one.'}
+                    : editTarget?.kind === 'receipt'
+                      ? 'Editing a receipt from your combine session — saving it below updates it there directly.'
+                      : 'Editing a saved bill — saving it below updates that entry instead of creating a new one.'}
                 </span>
                 <button
                   type="button"
-                  onClick={() => {
-                    setAddingForCombine(false)
-                    setEditingLibraryId(null)
-                  }}
+                  onClick={() => switchMode('combine')}
                   className="shrink-0 font-medium underline hover:no-underline"
                 >
                   Cancel
@@ -553,6 +611,11 @@ export default function App() {
               onTipValueChange={(tipValue) => setState((prev) => ({ ...prev, tipValue }))}
               onCashBackChange={(cashBackPercent) => setState((prev) => ({ ...prev, cashBackPercent }))}
             />
+            <PayerPicker
+              people={state.people}
+              payerId={state.payerId}
+              onChange={(payerId) => setState((prev) => ({ ...prev, payerId }))}
+            />
             <ResultsPanel summary={summary} tax={state.tax} paid={state.paid} onTogglePaid={togglePaid} />
             <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200">
               <button
@@ -561,9 +624,15 @@ export default function App() {
                 disabled={state.people.length === 0 && state.items.length === 0}
                 className="w-full rounded-xl border border-slate-300 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
               >
-                {editingLibraryId ? 'Update saved bill' : addingForCombine ? 'Add to combine session' : 'Save to library'}
+                {editTarget?.kind === 'receipt'
+                  ? 'Update receipt'
+                  : editTarget?.kind === 'library'
+                    ? 'Update saved bill'
+                    : addingForCombine
+                      ? 'Add to combine session'
+                      : 'Save to library'}
               </button>
-              {editingLibraryId ? (
+              {editTarget ? (
                 <button
                   type="button"
                   onClick={handleSaveAsNewFromEdit}
@@ -584,9 +653,11 @@ export default function App() {
           <CombinePage
             combineState={combineState}
             library={library}
+            highlightReceiptId={highlightReceiptId}
             onAddFiles={handleAddReceiptFiles}
             onStartNewBillForCombine={handleStartNewBillForCombine}
             onRemoveReceipt={handleRemoveReceipt}
+            onEditReceipt={handleEditReceipt}
             onToggleExpanded={handleToggleReceiptExpanded}
             onSetPayer={handleSetReceiptPayer}
             onCashBackPercentChange={handleCashBackPercentChange}

@@ -25,6 +25,9 @@ export interface BillState {
   tipValue: number
   cashBackPercent: number
   paid: Record<string, boolean>
+  /** Person id who fronted the money for this bill, or null if unset. Carries over automatically
+   *  when this bill is added into a Combine Receipts session. */
+  payerId: string | null
 }
 
 export interface PersonResult {

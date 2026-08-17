@@ -1,8 +1,9 @@
+import { useEffect, useState } from 'react'
 import type { CombineReceiptEntry } from '../types'
 import { formatCurrency } from '../lib/calculations'
 import { colorForIndex } from '../lib/palette'
 import PersonTag from './PersonTag'
-import { ChevronDownIcon } from './icons'
+import { ChevronDownIcon, PencilIcon } from './icons'
 
 interface ReceiptSectionProps {
   entry: CombineReceiptEntry
@@ -10,21 +11,43 @@ interface ReceiptSectionProps {
    *  looks the same everywhere in Combine Receipts even though each bill assigned its own
    *  colors independently when it was created. */
   nameColorMap: Map<string, number>
+  /** Briefly flashes then fades this card's background — used right after it's added/updated
+   *  from the single-bill build/edit flows, so the change is noticeable but not jarring. */
+  highlighted?: boolean
   onRemove: () => void
+  onEdit: () => void
   onToggleExpanded: () => void
   onSetPayer: (personId: string | null) => void
 }
 
-export default function ReceiptSection({ entry, nameColorMap, onRemove, onToggleExpanded, onSetPayer }: ReceiptSectionProps) {
+export default function ReceiptSection({
+  entry,
+  nameColorMap,
+  highlighted,
+  onRemove,
+  onEdit,
+  onToggleExpanded,
+  onSetPayer,
+}: ReceiptSectionProps) {
   const label = entry.status === 'done' && entry.bill ? entry.bill.title || entry.fileName : entry.fileName
   const canExpand = entry.status === 'done'
+
+  // The animation only needs to run once per highlight — re-mounting the class on every
+  // render (e.g. when other state in the list changes) would restart the flash repeatedly.
+  const [playFlash, setPlayFlash] = useState(!!highlighted)
+  useEffect(() => {
+    if (highlighted) setPlayFlash(true)
+  }, [highlighted])
 
   function colorIndexFor(name: string, fallback: number): number {
     return nameColorMap.get(name.trim().toLowerCase()) ?? fallback
   }
 
   return (
-    <div className={`rounded-xl border ${entry.status === 'error' ? 'border-red-200' : 'border-slate-200'}`}>
+    <div
+      className={`rounded-xl border ${entry.status === 'error' ? 'border-red-200' : 'border-slate-200'} ${playFlash ? 'flash-fade' : ''}`}
+      onAnimationEnd={() => setPlayFlash(false)}
+    >
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2">
           <button
@@ -43,11 +66,21 @@ export default function ReceiptSection({ entry, nameColorMap, onRemove, onToggle
             )}
             <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{label}</span>
           </button>
+          {canExpand && (
+            <button
+              type="button"
+              onClick={onEdit}
+              aria-label={`Edit ${label}`}
+              className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              <PencilIcon className="h-4 w-4" />
+            </button>
+          )}
           <button
             type="button"
             onClick={onRemove}
             aria-label={`Remove ${label}`}
-            className="shrink-0 rounded-full px-1.5 text-slate-400 hover:text-red-500"
+            className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500"
           >
             &times;
           </button>

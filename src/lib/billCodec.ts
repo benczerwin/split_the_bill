@@ -12,6 +12,7 @@ export interface CompactBill {
   tm: 0 | 1 // tip mode: 0 = amount, 1 = percent
   tv: number // tip value
   cb: number // cash back %
+  pay?: number // payer index into `p`, omitted if unset (also absent on older exports)
 }
 
 export const BILL_QR_PREFIX = 'STB1:'
@@ -36,6 +37,7 @@ export function billStateToCompact(state: BillState): CompactBill {
     tm: state.tipMode === 'percent' ? 1 : 0,
     tv: state.tipValue,
     cb: state.cashBackPercent,
+    pay: state.payerId ? indexOf.get(state.payerId) : undefined,
   }
 }
 
@@ -57,6 +59,7 @@ export function compactToBillState(compact: CompactBill): BillState {
     tipValue: compact.tv,
     cashBackPercent: compact.cb,
     paid: {},
+    payerId: compact.pay != null ? people[compact.pay]?.id ?? null : null,
   }
 }
 
