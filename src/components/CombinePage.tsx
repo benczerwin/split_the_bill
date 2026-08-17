@@ -16,9 +16,11 @@ import { PencilIcon } from './icons'
 interface CombinePageProps {
   combineState: CombineState
   library: SavedReceipt[]
+  highlightReceiptId?: string | null
   onAddFiles: (files: FileList | null) => void
   onStartNewBillForCombine: () => void
   onRemoveReceipt: (id: string) => void
+  onEditReceipt: (id: string) => void
   onToggleExpanded: (id: string) => void
   onSetPayer: (id: string, payerId: string | null) => void
   onCashBackPercentChange: (value: number) => void
@@ -32,9 +34,11 @@ interface CombinePageProps {
 export default function CombinePage({
   combineState,
   library,
+  highlightReceiptId,
   onAddFiles,
   onStartNewBillForCombine,
   onRemoveReceipt,
+  onEditReceipt,
   onToggleExpanded,
   onSetPayer,
   onCashBackPercentChange,
@@ -100,13 +104,13 @@ export default function CombinePage({
               {library.map((item) => {
                 const alreadyAdded = addedLibraryIds.has(item.id)
                 return (
-                  <div key={item.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
-                    <label className="flex min-w-0 flex-1 items-center gap-2">
+                  <div key={item.id} className="flex items-center gap-1 rounded-lg py-1 pl-2 pr-1 text-sm hover:bg-slate-50">
+                    <label className="flex min-w-0 flex-1 items-center gap-2 py-1">
                       <input
                         type="checkbox"
                         checked={alreadyAdded}
                         onChange={() => toggleLibraryItem(item.id)}
-                        className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
                       />
                       <span className="min-w-0 flex-1 truncate text-slate-700">{item.bill.title || 'Untitled bill'}</span>
                       {alreadyAdded && <span className="shrink-0 text-xs font-medium text-emerald-600">Added</span>}
@@ -116,15 +120,15 @@ export default function CombinePage({
                       type="button"
                       onClick={() => onEditLibraryItem(item.id)}
                       aria-label={`Edit ${item.bill.title || 'saved bill'}`}
-                      className="shrink-0 rounded-full p-1 text-slate-300 hover:text-slate-600"
+                      className="shrink-0 rounded-lg p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                     >
-                      <PencilIcon className="h-3.5 w-3.5" />
+                      <PencilIcon className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
                       onClick={() => onRemoveLibraryItem(item.id)}
                       aria-label={`Remove ${item.bill.title || 'saved bill'} from library`}
-                      className="shrink-0 rounded-full px-1 text-slate-300 hover:text-red-500"
+                      className="shrink-0 rounded-lg p-2.5 text-lg leading-none text-slate-400 hover:bg-slate-100 hover:text-red-500"
                     >
                       &times;
                     </button>
@@ -172,7 +176,9 @@ export default function CombinePage({
                 key={entry.id}
                 entry={entry}
                 nameColorMap={nameColorMap}
+                highlighted={entry.id === highlightReceiptId}
                 onRemove={() => onRemoveReceipt(entry.id)}
+                onEdit={() => onEditReceipt(entry.id)}
                 onToggleExpanded={() => onToggleExpanded(entry.id)}
                 onSetPayer={(payerId) => onSetPayer(entry.id, payerId)}
               />

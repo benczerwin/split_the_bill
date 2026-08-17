@@ -18,3 +18,19 @@ select,
 textarea {
   font-size: 16px !important;
 }
+
+/* Briefly highlights a newly-added or just-updated combine receipt, then fades to its normal
+   background, so returning to Combine Receipts after adding/editing a bill is less jarring than
+   the list just silently changing underneath you. */
+@keyframes flash-fade {
+  0% {
+    background-color: #d1fae5;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.flash-fade {
+  animation: flash-fade 2.2s ease-out;
+}
